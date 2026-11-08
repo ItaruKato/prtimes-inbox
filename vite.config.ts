@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'PR TIMES 受信箱',
-        short_name: 'PR受信箱',
+        name: 'PR Times Watcher',
+        short_name: 'PR Watcher',
         lang: 'ja',
         start_url: '/',
         display: 'standalone',

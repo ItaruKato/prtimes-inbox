@@ -6,7 +6,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
   return (
     <aside className="side">
       <div className="brand">
-        <b>PR TIMES 受信箱</b>
+        <b>PR Times Watcher</b>
         <small>{dataLabel}</small>
       </div>
       <nav className="navgroup" aria-label="振り分け">

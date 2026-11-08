@@ -23,7 +23,7 @@ export function Login({ auth, wrongUser }: { auth: Auth; wrongUser: User | null 
   return (
     <div className="login">
       <div className="logincard">
-        <b>PR TIMES 受信箱</b>
+        <b>PR Times Watcher</b>
         {wrongUser ? (
           <>
             <p>

@@ -1,4 +1,4 @@
-# PR TIMES 受信箱
+# PR Times Watcher
 
 PR TIMES の新着プレスリリースを集め、AIのおすすめ度で振り分けて読むための自分専用アプリ。
 iPhone（ホーム画面に追加）・Windows・Mac のブラウザで使う。
