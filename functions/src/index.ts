@@ -15,6 +15,13 @@ const db = getFirestore();
 const common = { region: 'asia-northeast1', timeZone: 'Asia/Tokyo' } as const;
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 
+/**
+ * Claude による判定・要約を行うか。
+ * いまは停止中（AIの判定が低くても読みたい記事が埋もれていたため。画面は新作ゲーム以外をすべて受信箱に入れる）。
+ * 戻すときは true にし、画面側の src/lib/flags.ts の AI_SCORING も true にする。
+ */
+const AI_ENABLED = false;
+
 /** 1時間ごとに PR TIMES の新着を取得（毎時5分） */
 export const collectHourly = onSchedule(
   { ...common, schedule: '5 * * * *', timeoutSeconds: 540, memory: '512MiB', retryCount: 1 },
@@ -33,6 +40,7 @@ export const enrichHourly = onSchedule(
   { ...common, schedule: '10,30,50 * * * *', timeoutSeconds: 1200, memory: '1GiB', secrets: [anthropicKey] },
   async () => {
     // 429（利用上限）・529（混雑）は SDK が retry-after に従って2回までやり直す。応答が止まったときは 150 秒で打ち切る
+    if (!AI_ENABLED) return;
     const client = new Anthropic({ apiKey: anthropicKey.value(), maxRetries: 2, timeout: 150_000 });
     await enrich({ db, client, log: (msg, data) => logger.info(msg, data) });
   },

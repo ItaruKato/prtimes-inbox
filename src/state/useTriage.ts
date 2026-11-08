@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AiStatus, Decision, Item, Status, TagKey } from '../types';
 import type { Repo } from '../data/repo';
+import { AI_SCORING } from '../lib/flags';
 
 export type TagFilter = 'all' | 'other' | TagKey;
 
 /** AIの判定から決まる初期の振り分け先 */
 export function defaultStatus(it: Item): Status {
-  if (it.judge.autoExclude) return 'drop';
+  if (!AI_SCORING) return it.game ? 'drop' : 'inbox';
+  if (it.game || it.judge.autoExclude) return 'drop';
   return it.judge.score === 'high' ? 'inbox' : it.judge.score === 'mid' ? 'cand' : 'drop';
 }
 

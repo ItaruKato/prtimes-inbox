@@ -2,6 +2,7 @@ import { memo, useRef } from 'react';
 import type { Item, Status } from '../types';
 import { hm } from '../lib/format';
 import { TagPills } from './TagPills';
+import { AI_SCORING } from '../lib/flags';
 
 interface Props {
   it: Item;
@@ -21,7 +22,7 @@ function swipeTarget(st: Status, dir: 1 | -1, back: Status): Status {
 export const ArticleRow = memo(function ArticleRow({ it, st, selected, autoNote, onOpen, onAct }: Props) {
   const rowRef = useRef<HTMLDivElement>(null);
   const sw = useRef<{ x: number; y: number; dx: number; lock: 'x' | 'y' | null } | null>(null);
-  const back: Status = it.judge.score === 'mid' ? 'cand' : 'inbox';
+  const back: Status = AI_SCORING && it.judge.score === 'mid' ? 'cand' : 'inbox';
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];

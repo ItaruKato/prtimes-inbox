@@ -13,7 +13,7 @@ import {
 import type { AiStatus, Article, Decision, Item } from '../types';
 import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
-import { mockJudge } from '../lib/mockJudge';
+import { toItem } from '../lib/mode';
 
 /** 画面に読み込む日数（受信箱・候補・不要）。「読む」「既読」は saved から全期間読む */
 export const LOAD_DAYS = 10;
@@ -25,7 +25,6 @@ export function jstKey(ts: number, len: 8 | 10): string {
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}`.slice(0, len);
 }
 
-const toItem = (a: Article): Item => ({ ...a, ts: new Date(a.publishedAt).getTime(), judge: a.ai ?? mockJudge(a) });
 
 interface SavedDoc {
   article: Article;

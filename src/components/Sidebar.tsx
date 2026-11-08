@@ -2,6 +2,7 @@ import type { Triage } from '../state/useTriage';
 import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
 import { USD_JPY } from '../lib/aiCost';
+import { AI_SCORING } from '../lib/flags';
 
 export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: string; onSignOut?: () => void }) {
   return (
@@ -24,7 +25,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
       </nav>
       {t.aiStatus && (
         <div className="aibox">
-          <b>Claude の判定</b>
+          <b>{AI_SCORING ? 'Claude の判定' : 'Claude（いまは停止中）'}</b>
           <div>
             最終実行 {t.aiStatus.lastRunAt ? new Date(t.aiStatus.lastRunAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
             {t.aiStatus.judged !== undefined && `（判定 ${num(t.aiStatus.judged)}件・要約 ${num(t.aiStatus.summarized ?? 0)}件）`}
@@ -42,11 +43,13 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
         <div>・新作ゲームの案内</div>
         <div className="muted">定時株主総会などは後から追加予定</div>
       </div>
+{AI_SCORING && (
       <div className="learn">
         AIに渡す学習データ
         <br />
         手動で不要 <strong>{num(t.learning.manualDrop)}</strong> 件 ・ 候補から拾った <strong>{num(t.learning.picked)}</strong> 件
       </div>
+      )}
       <div className="hint">
         <div>
           <span className="kbd">J</span>/<span className="kbd">K</span> 移動 <span className="kbd">R</span> 読む{' '}

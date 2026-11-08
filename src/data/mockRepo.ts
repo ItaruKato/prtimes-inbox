@@ -1,13 +1,11 @@
 import type { Article, Decision, Item } from '../types';
 import type { Repo } from './repo';
-import { mockJudge } from '../lib/mockJudge';
+import { toItem } from '../lib/mode';
 import sample from './sample.json';
 
 const LS_KEY = 'prt-decisions-v1';
 
-function toItem(a: Article): Item {
-  return { ...a, ts: new Date(a.publishedAt).getTime(), judge: a.ai ?? mockJudge(a) };
-}
+
 
 /** 負荷テスト用：実データを複製し、直近2日間に各3,000件をばらす */
 function stress(base: Item[]): Item[] {

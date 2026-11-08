@@ -2,6 +2,7 @@ import type { Triage } from '../state/useTriage';
 import { SCORE_LABEL, VIEWS } from '../lib/tags';
 import { fullDate } from '../lib/format';
 import { TagPills } from './TagPills';
+import { AI_SCORING } from '../lib/flags';
 
 export function DetailPane({ t }: { t: Triage }) {
   const it = t.sel ? t.byId.get(t.sel) : undefined;
@@ -12,7 +13,7 @@ export function DetailPane({ t }: { t: Triage }) {
       </aside>
     );
   const st = t.statusOf(it);
-  const back = it.judge.score === 'mid' ? 'cand' : 'inbox';
+  const back = AI_SCORING && it.judge.score === 'mid' ? 'cand' : 'inbox';
   return (
     <aside className="detail" data-open="true" aria-label="記事の詳細">
       <div className="dhead">
@@ -46,11 +47,13 @@ export function DetailPane({ t }: { t: Triage }) {
             </button>
           )}
         </div>
-        <div className="summary">
-          <b>おすすめ度：{SCORE_LABEL[it.judge.score]}</b>
-          {it.judge.reason}
-          {(!it.judge.by || it.judge.by.startsWith('rule')) && '（キーワードによる仮判定）'}
-        </div>
+        {AI_SCORING && (
+          <div className="summary">
+            <b>おすすめ度：{SCORE_LABEL[it.judge.score]}</b>
+            {it.judge.reason}
+            {(!it.judge.by || it.judge.by.startsWith('rule')) && '（キーワードによる仮判定）'}
+          </div>
+        )}
         {it.judge.summary ? (
           <div className="summary ai">
             <b>Claude による要約</b>
@@ -67,6 +70,7 @@ export function DetailPane({ t }: { t: Triage }) {
             )}
           </div>
         ) : (
+          AI_SCORING &&
           it.judge.score === 'high' && (
             <div className="summary muted small">要約は、おすすめ度「高」の記事に1時間以内に付きます。</div>
           )

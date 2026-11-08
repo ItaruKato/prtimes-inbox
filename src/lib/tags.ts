@@ -1,4 +1,5 @@
 import type { Score, Status, TagKey } from '../types';
+import { AI_SCORING } from './flags';
 
 export const TAGS: { k: TagKey; label: string }[] = [
   { k: 'fund', label: '資金調達' },
@@ -9,12 +10,19 @@ export const TAGS: { k: TagKey; label: string }[] = [
 ];
 export const tagLabel = (k: TagKey) => TAGS.find((t) => t.k === k)!.label;
 
-export const VIEWS: { k: Status; label: string; note?: string }[] = [
-  { k: 'inbox', label: '受信箱', note: 'おすすめ度 高' },
-  { k: 'cand', label: '候補', note: 'おすすめ度 中' },
-  { k: 'keep', label: '読む' },
-  { k: 'done', label: '既読' },
-  { k: 'drop', label: '不要' },
-];
+export const VIEWS: { k: Status; label: string; note?: string }[] = AI_SCORING
+  ? [
+      { k: 'inbox', label: '受信箱', note: 'おすすめ度 高' },
+      { k: 'cand', label: '候補', note: 'おすすめ度 中' },
+      { k: 'keep', label: '読む' },
+      { k: 'done', label: '既読' },
+      { k: 'drop', label: '不要' },
+    ]
+  : [
+      { k: 'inbox', label: '受信箱', note: '新作ゲーム以外すべて' },
+      { k: 'keep', label: '読む' },
+      { k: 'done', label: '既読' },
+      { k: 'drop', label: '不要' },
+    ];
 
 export const SCORE_LABEL: Record<Score, string> = { high: '高', mid: '中', low: '低' };

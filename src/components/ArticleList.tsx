@@ -3,11 +3,12 @@ import type { Item, Status } from '../types';
 import type { Triage } from '../state/useTriage';
 import { dayKey, num } from '../lib/format';
 import { ArticleRow } from './ArticleRow';
+import { AI_SCORING } from '../lib/flags';
 
 const PAGE = 150;
 
 const EMPTY: Record<Status, [string, string]> = {
-  inbox: ['受信箱は空です', 'おすすめ度「高」の新着が1時間ごとに届きます'],
+  inbox: ['受信箱は空です', AI_SCORING ? 'おすすめ度「高」の新着が1時間ごとに届きます' : '新着が1時間ごとに届きます'],
   cand: ['候補はありません', 'おすすめ度「中」の記事がここに入ります'],
   keep: ['「読む」に入れた記事はありません', '受信箱で「読む」を押すとここに入ります'],
   done: ['既読の記事はありません', '読み終えた記事がここにたまります'],
@@ -73,11 +74,13 @@ export function ArticleList({ t }: { t: Triage }) {
         const st = t.statusOf(it);
         const note =
           st === 'drop' && !t.decided(it.id)
-            ? it.judge.autoExclude
-              ? `自動除外：${it.judge.autoExclude}`
-              : it.judge.score === 'low'
-                ? 'AI判定：低'
-                : ''
+            ? it.game
+              ? '自動除外：新作ゲーム'
+              : AI_SCORING && it.judge.autoExclude
+                ? `自動除外：${it.judge.autoExclude}`
+                : AI_SCORING && it.judge.score === 'low'
+                  ? 'AI判定：低'
+                  : ''
             : '';
         return (
           <Fragment key={it.id}>

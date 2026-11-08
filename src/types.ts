@@ -32,6 +32,8 @@ export interface AiJudgement {
 export interface Item extends Article {
   ts: number;
   judge: AiJudgement;
+  /** 新作ゲームの案内か（自動で「不要」に入れる） */
+  game: boolean;
 }
 
 export type Status = 'inbox' | 'cand' | 'keep' | 'done' | 'drop';
