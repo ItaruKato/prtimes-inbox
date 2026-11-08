@@ -172,3 +172,4 @@ button{font:inherit;color:inherit;cursor:pointer}
 .points div{display:grid;grid-template-columns:7em minmax(0,1fr);gap:8px}
 .points dt{color:var(--ink-3);font-size:12px}
 .points dd{margin:0;color:var(--ink);font-size:13px;overflow-wrap:anywhere}
+.aibox .err{color:var(--drop)}

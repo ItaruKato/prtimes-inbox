@@ -54,6 +54,8 @@ export interface AiStatus {
   judged?: number;
   summarized?: number;
   backlog?: number;
+  judgeErrors?: number;
+  summaryErrors?: number;
   /** 今月の費用（米ドル） */
   monthUsd: number;
 }

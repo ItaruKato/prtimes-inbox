@@ -29,6 +29,11 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
             最終実行 {t.aiStatus.lastRunAt ? new Date(t.aiStatus.lastRunAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
             {t.aiStatus.judged !== undefined && `（判定 ${num(t.aiStatus.judged)}件・要約 ${num(t.aiStatus.summarized ?? 0)}件）`}
           </div>
+          {((t.aiStatus.judgeErrors ?? 0) > 0 || (t.aiStatus.summaryErrors ?? 0) > 0) && (
+            <div className="err">
+              前回エラー：判定 {t.aiStatus.judgeErrors ?? 0}回・要約 {t.aiStatus.summaryErrors ?? 0}回（次の回に自動でやり直します）
+            </div>
+          )}
           <div>今月の費用 約{num(Math.round(t.aiStatus.monthUsd * USD_JPY))}円（${t.aiStatus.monthUsd.toFixed(2)}）</div>
         </div>
       )}
