@@ -31,18 +31,19 @@ function stress(base: Item[]): Item[] {
 }
 
 export function createMockRepo(opts: { stress?: boolean } = {}): Repo {
+  const loadDecisions = (): Record<string, Decision> => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_KEY) || '{}') as Record<string, Decision>;
+    } catch {
+      return {};
+    }
+  };
   return {
-    async loadItems() {
+    subscribe(onData) {
       const base = (sample as Article[]).map(toItem);
-      const items = opts.stress ? stress(base) : base;
-      return items.sort((a, b) => b.ts - a.ts);
-    },
-    async loadDecisions() {
-      try {
-        return JSON.parse(localStorage.getItem(LS_KEY) || '{}') as Record<string, Decision>;
-      } catch {
-        return {};
-      }
+      const items = (opts.stress ? stress(base) : base).sort((a, b) => b.ts - a.ts);
+      const t = setTimeout(() => onData({ items, decisions: loadDecisions() }), 0);
+      return () => clearTimeout(t);
     },
     async saveDecisions(changes) {
       try {

@@ -1,5 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { createMockRepo } from './data/mockRepo';
+import { createFirestoreRepo, LOAD_DAYS } from './data/firestoreRepo';
+import type { Repo } from './data/repo';
+import { firebaseEnabled, getFirebase, OWNER_EMAIL } from './firebase';
+import { Login } from './components/Login';
 import { useTriage } from './state/useTriage';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -12,7 +17,26 @@ import { ToastView } from './components/ToastView';
 const stress = new URLSearchParams(location.search).has('stress');
 
 export default function App() {
+  return firebaseEnabled ? <WithFirebase /> : <MockApp />;
+}
+
+function MockApp() {
   const repo = useMemo(() => createMockRepo({ stress }), []);
+  return <Inbox repo={repo} source={(n) => `試作データ ${n}件${stress ? '（負荷テスト）' : ''}`} />;
+}
+
+function WithFirebase() {
+  const { auth, db } = getFirebase();
+  const [user, setUser] = useState<User | null | undefined>(undefined);
+  useEffect(() => onAuthStateChanged(auth, setUser), [auth]);
+  const ok = user && user.email === OWNER_EMAIL && user.emailVerified;
+  const repo = useMemo(() => (ok ? createFirestoreRepo(db) : null), [ok, db]);
+  if (user === undefined) return <div className="login"><div className="logincard">読み込み中…</div></div>;
+  if (!ok || !repo) return <Login auth={auth} wrongUser={user} />;
+  return <Inbox repo={repo} source={(n) => `直近${LOAD_DAYS}日 ＋ 読む・既読 ${n}件`} onSignOut={() => signOut(auth)} />;
+}
+
+function Inbox({ repo, source, onSignOut }: { repo: Repo; source: (n: string) => string; onSignOut?: () => void }) {
   const t = useTriage(repo);
 
   // キーボード操作（Windows / Mac）
@@ -41,11 +65,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [t]);
 
-  const dataLabel = t.loading ? '読み込み中…' : `試作データ ${t.items.length.toLocaleString('ja-JP')}件${stress ? '（負荷テスト）' : ''}`;
+  const dataLabel = t.error ? `読み込みエラー：${t.error}` : t.loading ? '読み込み中…' : source(t.items.length.toLocaleString('ja-JP'));
 
   return (
     <div className="app">
-      <Sidebar t={t} dataLabel={dataLabel} />
+      <Sidebar t={t} dataLabel={dataLabel} onSignOut={onSignOut} />
       <section className="main">
         <TopBar t={t} />
         <ArticleList t={t} />

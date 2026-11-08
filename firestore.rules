@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// 使用者は1人だけ。ログインしたGoogleアカウントのメールアドレスで制限する。
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'i-kato@spark-partners.jp';
+    }
+
+    // 取得処理（Cloud Functions）だけが書き込む
+    match /buckets/{hour} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /meta/{doc} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /companies/{id} {
+      allow read, write: if false;
+    }
+
+    // 振り分け（日ごと）と、無期限で残す「読む」「既読」記事
+    match /decisions/{day} {
+      allow read, write: if isOwner();
+    }
+    match /saved/{id} {
+      allow read, write: if isOwner();
+    }
+  }
+}

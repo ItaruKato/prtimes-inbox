@@ -35,18 +35,21 @@ export function useTriage(repo: Repo) {
   const [toast, setToast] = useState<Toast | null>(null);
   const toastSeq = useRef(0);
 
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    let alive = true;
     setLoading(true);
-    Promise.all([repo.loadItems(), repo.loadDecisions()]).then(([its, d]) => {
-      if (!alive) return;
-      setItems(its);
-      setDec(d);
-      setLoading(false);
-    });
-    return () => {
-      alive = false;
-    };
+    return repo.subscribe(
+      ({ items: its, decisions }) => {
+        setItems(its);
+        setDec(decisions);
+        setLoading(false);
+        setError(null);
+      },
+      (e) => {
+        setError(e.message);
+        setLoading(false);
+      },
+    );
   }, [repo]);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -146,6 +149,7 @@ export function useTriage(repo: Repo) {
 
   return {
     loading,
+    error,
     items,
     byId,
     statusOf,

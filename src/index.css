@@ -158,3 +158,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .small{font-size:12px}
 .toast span,.toast button{white-space:nowrap}
 .toast{width:max-content}
+.login{min-height:100%;display:grid;place-items:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.logincard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 24px;display:flex;flex-direction:column;gap:14px;max-width:360px;width:100%}
+.logincard b{font-size:18px}
+.logincard p{margin:0;color:var(--ink-2);font-size:13px;line-height:1.7}
+.logincard .err{color:var(--drop)}
+.sideactions{padding:0 8px;margin-top:auto}

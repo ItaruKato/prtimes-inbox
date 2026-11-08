@@ -2,7 +2,7 @@ import type { Triage } from '../state/useTriage';
 import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
 
-export function Sidebar({ t, dataLabel }: { t: Triage; dataLabel: string }) {
+export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: string; onSignOut?: () => void }) {
   return (
     <aside className="side">
       <div className="brand">
@@ -40,6 +40,11 @@ export function Sidebar({ t, dataLabel }: { t: Triage; dataLabel: string }) {
           <span className="kbd">E</span> 既読 <span className="kbd">O</span> PR TIMESで開く
         </div>
       </div>
+      {onSignOut && (
+        <div className="sideactions">
+          <button className="ghost" type="button" onClick={onSignOut}>ログアウト</button>
+        </div>
+      )}
     </aside>
   );
 }
