@@ -17,7 +17,8 @@ gcloud services enable iam.googleapis.com iamcredentials.googleapis.com sts.goog
   cloudresourcemanager.googleapis.com serviceusage.googleapis.com firestore.googleapis.com \
   cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   run.googleapis.com cloudscheduler.googleapis.com eventarc.googleapis.com pubsub.googleapis.com \
-  firebase.googleapis.com firebasehosting.googleapis.com firebaserules.googleapis.com compute.googleapis.com
+  firebase.googleapis.com firebasehosting.googleapis.com firebaserules.googleapis.com compute.googleapis.com \
+  cloudbilling.googleapis.com firebaseextensions.googleapis.com
 
 echo "== Firestore（東京）を作成"
 gcloud firestore databases describe --database='(default)' >/dev/null 2>&1 \
