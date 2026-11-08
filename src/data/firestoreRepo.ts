@@ -8,6 +8,7 @@ import {
   where,
   writeBatch,
   type Firestore,
+  type WriteBatch,
 } from 'firebase/firestore';
 import type { AiStatus, Article, Decision, Item } from '../types';
 import { costUsd, type UsageTotals } from '../lib/aiCost';
@@ -33,6 +34,8 @@ interface SavedDoc {
 
 export function createFirestoreRepo(db: Firestore): Repo {
   const byId = new Map<string, Item>();
+  /** saved にドキュメントがある記事（無い記事に削除を送らないため） */
+  const savedIds = new Set<string>();
 
   return {
     subscribe(onData, onError) {
@@ -59,7 +62,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
 
       const unsubs = [
         onSnapshot(
-          query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 10))),
+          // 開始位置を日単位にそろえ、同じ日のうちは同じクエリにする（開き直しても差分だけ受け取る）
+          query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 8) + '00')),
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
@@ -76,8 +80,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
-            // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
-            if (snap.metadata.fromCache && snap.empty) return;
+            // 0件は普通にある。キャッシュの0件も受け取る（オフラインで開いたとき止まらないように）。
+            // 一度も同期していない端末では、SDK がサーバーの結果を待ってから届けるので「0件」は一瞬も出ない
             dayDecisions = new Map(snap.docs.map((d) => [d.id, (d.data().d ?? {}) as Record<string, Decision>]));
             ready.decisions = true;
             emit();
@@ -89,9 +93,10 @@ export function createFirestoreRepo(db: Firestore): Repo {
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
-            // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
-            if (snap.metadata.fromCache && snap.empty) return;
+            // 0件は普通にある（「読む」「既読」が空）。キャッシュの0件も受け取る（上と同じ理由）
             saved = new Map(snap.docs.map((d) => [d.id, d.data() as SavedDoc]));
+            savedIds.clear();
+            for (const id of saved.keys()) savedIds.add(id);
             ready.saved = true;
             emit();
           },
@@ -131,7 +136,7 @@ export function createFirestoreRepo(db: Firestore): Repo {
 
     async saveDecisions(changes) {
       // decisions/{記事の配信日} にまとめて書く。「読む」「既読」は記事ごと saved にも残す（無期限）
-      const batch = writeBatch(db);
+      const ops: ((b: WriteBatch) => void)[] = [];
       const perDay = new Map<string, Record<string, Decision | ReturnType<typeof deleteField>>>();
       for (const [id, d] of Object.entries(changes)) {
         const it = byId.get(id);
@@ -145,11 +150,25 @@ export function createFirestoreRepo(db: Firestore): Repo {
           const { ts: _ts, judge: _judge, ...article } = it;
           void _ts;
           void _judge;
-          batch.set(savedRef, { article, decision: d });
-        } else batch.delete(savedRef);
+          ops.push((b) => b.set(savedRef, { article, decision: d }));
+          savedIds.add(id);
+        } else if (savedIds.has(id)) {
+          // 無い記事に削除は送らない（「まとめて不要」が数千件の書き込みになり、端末が固まる）
+          ops.push((b) => b.delete(savedRef));
+          savedIds.delete(id);
+        }
       }
-      for (const [day, m] of perDay) batch.set(doc(db, 'decisions', day), { d: m }, { merge: true });
-      await batch.commit();
+      for (const [day, m] of perDay) ops.push((b) => b.set(doc(db, 'decisions', day), { d: m }, { merge: true }));
+      // 1回のバッチは小さく分ける。SDK は端末内の保存で「書き込み数 × バッチ全体」の量を書くため、
+      // 大きなバッチは件数の2乗で重くなる（2,000件で十数秒固まる）。
+      // commit は待たずに全部出す（オフラインでも後ろのバッチが端末内に入るように）
+      const commits: Promise<void>[] = [];
+      for (let i = 0; i < ops.length; i += 100) {
+        const batch = writeBatch(db);
+        for (const op of ops.slice(i, i + 100)) op(batch);
+        commits.push(batch.commit());
+      }
+      await Promise.all(commits);
     },
   };
 }

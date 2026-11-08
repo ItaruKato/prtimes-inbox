@@ -50,6 +50,9 @@ export function ArticleList({ t }: { t: Triage }) {
   }, [visible]);
 
   if (t.loading) return <div className="list"><div className="empty">読み込み中…</div></div>;
+  // スマホでは左の欄（エラー表示）が出ないので、一覧にも出す
+  if (t.error && !t.items.length)
+    return <div className="list"><div className="empty"><b>読み込めませんでした</b>{t.error}</div></div>;
   if (!visible.length) {
     const [a, b] = EMPTY[view];
     return (
