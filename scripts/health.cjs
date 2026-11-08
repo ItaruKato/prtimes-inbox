@@ -1,0 +1,97 @@
+// 本番の健康診断（GitHub Actions の health ワークフローから実行）
+// Firestore の状態と、直近のエラーログ、公開ページの応答をまとめて表示する。
+const path = require('path');
+const fs = require('fs');
+const { execSync } = require('child_process');
+const F = path.join(__dirname, '..', 'functions', 'node_modules', 'firebase-admin', 'lib');
+const { initializeApp } = require(path.join(F, 'app'));
+const { getFirestore, FieldPath } = require(path.join(F, 'firestore'));
+
+initializeApp({ projectId: 'prtimes-inbox' });
+const db = getFirestore();
+
+const jst = (ms, len) => {
+  const d = new Date(ms + 9 * 3600e3);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}`.slice(0, len);
+};
+
+(async () => {
+  const out = [];
+  const log = (s) => {
+    out.push(s);
+    console.log(s);
+  };
+  const now = Date.now();
+
+  for (const id of ['collector', 'backfill', 'backfillStore', 'ai']) {
+    const d = (await db.doc(`meta/${id}`).get()).data();
+    log(`meta/${id}: ${JSON.stringify(d ?? null)}`);
+  }
+
+  const since = jst(now - 10 * 86400e3, 10);
+  const snap = await db.collection('buckets').where(FieldPath.documentId(), '>=', since).get();
+  let total = 0;
+  let maxBytes = 0;
+  let maxDoc = '';
+  const byModel = {};
+  const byScore = {};
+  let summarized = 0;
+  let highNoSummary = 0;
+  let latest = '';
+  const perDay = {};
+  for (const d of snap.docs) {
+    const bytes = Buffer.byteLength(JSON.stringify(d.data()));
+    if (bytes > maxBytes) {
+      maxBytes = bytes;
+      maxDoc = d.id;
+    }
+    for (const a of Object.values(d.data().items ?? {})) {
+      total++;
+      perDay[d.id.slice(0, 8)] = (perDay[d.id.slice(0, 8)] ?? 0) + 1;
+      const by = a.ai?.by ?? 'none';
+      byModel[by] = (byModel[by] ?? 0) + 1;
+      const sc = a.ai?.score ?? 'none';
+      byScore[sc] = (byScore[sc] ?? 0) + 1;
+      if (a.ai?.summary) summarized++;
+      else if (a.ai?.score === 'high' && !a.ai?.autoExclude && !String(by).startsWith('rule')) highNoSummary++;
+      if (a.publishedAt > latest) latest = a.publishedAt;
+    }
+  }
+  log(`buckets(10日): ${snap.size}件のドキュメント / 記事 ${total}件 / 最新の配信 ${latest}`);
+  log(`日別: ${JSON.stringify(perDay)}`);
+  log(`判定者: ${JSON.stringify(byModel)}`);
+  log(`おすすめ度: ${JSON.stringify(byScore)}`);
+  log(`要約あり: ${summarized} / 要約待ちの高: ${highNoSummary}`);
+  log(`最大のバケット: ${maxDoc} 約${Math.round(maxBytes / 1024)}KB（上限 1MB）`);
+
+  const usage = await db.collection('aiUsage').where(FieldPath.documentId(), '>=', jst(now, 8).slice(0, 6) + '01').get();
+  log(`aiUsage: ${JSON.stringify(Object.fromEntries(usage.docs.map((d) => [d.id, d.data()])))}`);
+  const dec = await db.collection('decisions').get();
+  const saved = await db.collection('saved').count().get();
+  log(`decisions: ${dec.size}日分 / saved: ${saved.data().count}件`);
+
+  try {
+    const errs = execSync(
+      `gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR AND timestamp>="${new Date(now - 6 * 3600e3).toISOString()}"' --project=prtimes-inbox --limit=20 --format='value(timestamp,resource.labels.service_name,textPayload,jsonPayload.message)'`,
+      { encoding: 'utf8' },
+    ).trim();
+    log(`直近6時間のエラー:\n${errs || '（なし）'}`);
+  } catch (e) {
+    log(`ログの取得に失敗: ${String(e).slice(0, 300)}`);
+  }
+
+  try {
+    const res = await fetch('https://prtimes-inbox.web.app/');
+    const html = await res.text();
+    log(`公開ページ: HTTP ${res.status} / title=${(html.match(/<title>(.*?)<\/title>/) ?? [])[1]}`);
+  } catch (e) {
+    log(`公開ページの取得に失敗: ${e}`);
+  }
+
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '```\n' + out.join('\n') + '\n```\n');
+  process.exit(0);
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
