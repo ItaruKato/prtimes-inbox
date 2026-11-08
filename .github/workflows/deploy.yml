@@ -1,0 +1,44 @@
+name: test-and-deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: prtimes-inbox
+  # scripts/setup-gcp.sh の最後に表示される番号（秘密情報ではない）。空のあいだはデプロイしない
+  PROJECT_NUMBER: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - name: 画面のビルド
+        run: npm ci && npm run build
+      - name: 取得処理のビルドとテスト
+        working-directory: functions
+        run: npm ci && npm run build && npm test
+
+      - name: Google Cloud に認証
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.PROJECT_NUMBER != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+      - name: Firebase にデプロイ
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.PROJECT_NUMBER != ''
+        run: npx -y firebase-tools@14.11.0 deploy --project "$PROJECT_ID" --non-interactive --force
