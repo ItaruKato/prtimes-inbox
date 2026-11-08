@@ -30,6 +30,10 @@ gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \
 for ROLE in roles/editor roles/firebase.admin roles/cloudfunctions.admin roles/run.admin roles/iam.serviceAccountUser; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$ROLE" --condition=None --quiet >/dev/null
 done
+# 処理を実行するアカウント（既定のコンピュートアカウント）にデータベースの読み書きを許可する
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role=roles/datastore.user --condition=None --quiet >/dev/null
 # Cloud Functions のビルドに使われるアカウントにビルド権限を付ける
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
