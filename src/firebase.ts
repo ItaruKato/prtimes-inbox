@@ -11,15 +11,14 @@ import {
 /**
  * Firebase コンソール →「プロジェクトの設定」→「マイアプリ」のウェブアプリの設定値。
  * ブラウザに配られる公開情報なので、リポジトリに置いてよい（アクセス制限は firestore.rules で行う）。
- * apiKey が空のあいだは試作データで動く。
  */
 export const firebaseConfig = {
-  apiKey: '',
+  apiKey: 'AIzaSyC47E7jrvlXY_XybBfSjRMaFJL2_f7YUDQ',
   authDomain: 'prtimes-inbox.firebaseapp.com',
   projectId: 'prtimes-inbox',
   storageBucket: 'prtimes-inbox.firebasestorage.app',
-  messagingSenderId: '',
-  appId: '',
+  messagingSenderId: '723210521199',
+  appId: '1:723210521199:web:b1b8ec31e4ca9e17271b9a',
 };
 
 /** ログインを許可するGoogleアカウント（firestore.rules と同じ値にする） */
