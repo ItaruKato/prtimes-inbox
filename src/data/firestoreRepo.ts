@@ -9,7 +9,8 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
-import type { Article, Decision, Item } from '../types';
+import type { AiStatus, Article, Decision, Item } from '../types';
+import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
 import { mockJudge } from '../lib/mockJudge';
 
@@ -86,6 +87,34 @@ export function createFirestoreRepo(db: Firestore): Repo {
         ),
       ];
       return () => unsubs.forEach((u) => u());
+    },
+
+    subscribeAiStatus(onData) {
+      // 今月の利用量（日ごとのドキュメント）と、最後の実行結果
+      const monthStart = jstKey(Date.now(), 8).slice(0, 6) + '01';
+      let usage = 0;
+      let meta: Partial<AiStatus> = {};
+      const emit = () => onData({ ...meta, monthUsd: usage });
+      const u1 = onSnapshot(
+        query(collection(db, 'aiUsage'), where(documentId(), '>=', monthStart)),
+        (snap) => {
+          usage = snap.docs.reduce((sum, d) => sum + costUsd(d.data() as Record<string, UsageTotals>), 0);
+          emit();
+        },
+        () => {},
+      );
+      const u2 = onSnapshot(
+        doc(db, 'meta', 'ai'),
+        (d) => {
+          meta = (d.data() ?? {}) as Partial<AiStatus>;
+          emit();
+        },
+        () => {},
+      );
+      return () => {
+        u1();
+        u2();
+      };
     },
 
     async saveDecisions(changes) {

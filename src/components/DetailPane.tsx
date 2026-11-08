@@ -47,14 +47,30 @@ export function DetailPane({ t }: { t: Triage }) {
           )}
         </div>
         <div className="summary">
-          <b>AIのおすすめ度：{SCORE_LABEL[it.judge.score]}</b>
+          <b>おすすめ度：{SCORE_LABEL[it.judge.score]}</b>
           {it.judge.reason}
-          {!it.ai && '（仮判定）'}
+          {(!it.judge.by || it.judge.by.startsWith('rule')) && '（キーワードによる仮判定）'}
         </div>
-        <div className="summary">
-          <b>AI要約</b>
-          {it.judge.summary ?? '本番ではここにClaudeの要約と、調達額・引受先・買収先などの要点を表示します。'}
-        </div>
+        {it.judge.summary ? (
+          <div className="summary ai">
+            <b>Claude による要約</b>
+            <p className="sumtext">{it.judge.summary}</p>
+            {it.judge.points && it.judge.points.length > 0 && (
+              <dl className="points">
+                {it.judge.points.map((p, i) => (
+                  <div key={i}>
+                    <dt>{p.label}</dt>
+                    <dd>{p.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        ) : (
+          it.judge.score === 'high' && (
+            <div className="summary muted small">要約は、おすすめ度「高」の記事に1時間以内に付きます。</div>
+          )
+        )}
         {it.lead ? <div className="lead">{it.lead}</div> : <div className="lead muted">本文の冒頭は未取得です。</div>}
         {it.keywords.length > 0 && (
           <div className="kw">

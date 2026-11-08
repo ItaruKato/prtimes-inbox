@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Decision, Item, Status, TagKey } from '../types';
+import type { AiStatus, Decision, Item, Status, TagKey } from '../types';
 import type { Repo } from '../data/repo';
 
 export type TagFilter = 'all' | 'other' | TagKey;
@@ -36,6 +36,8 @@ export function useTriage(repo: Repo) {
   const toastSeq = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
+  useEffect(() => repo.subscribeAiStatus?.(setAiStatus), [repo]);
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(
@@ -126,7 +128,10 @@ export function useTriage(repo: Repo) {
       const it = byId.get(id);
       if (!it) return;
       // AIの初期判定と同じ場所に戻す場合は記録を消す
-      const change = status === defaultStatus(it) ? null : { status, how: 'manual' as const, at: Date.now() };
+      const change: Decision | null =
+        status === defaultStatus(it)
+          ? null
+          : { status, how: 'manual', at: Date.now(), title: it.title, company: it.company, aiScore: it.judge.score };
       const undo = apply({ [id]: change });
       showToast(LABEL[status], undo);
     },
@@ -150,6 +155,7 @@ export function useTriage(repo: Repo) {
   return {
     loading,
     error,
+    aiStatus,
     items,
     byId,
     statusOf,

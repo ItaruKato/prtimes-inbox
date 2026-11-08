@@ -18,6 +18,10 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    match /aiUsage/{day} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
     match /companies/{id} {
       allow read, write: if false;
     }

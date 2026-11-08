@@ -114,3 +114,37 @@ export function bucketKey(publishedAt: string): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}`;
 }
+
+/** 記事ページから本文テキストを取り出す（要約用） */
+export function extractBody(html: string, maxChars = 6000): string {
+  const i = html.indexOf('id="press-release-body"');
+  if (i < 0) return '';
+  // 本文の <div> の閉じタグまでを取る（入れ子の div を数える）
+  const start = html.indexOf('>', i) + 1;
+  const re = /<(\/?)div\b/g;
+  re.lastIndex = start;
+  let depth = 1;
+  let end = html.length;
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) {
+      end = m.index;
+      break;
+    }
+  }
+  const chunk = html.slice(start, end);
+  const text = chunk
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '')
+    .replace(/<(br|\/p|\/h\d|\/li|\/tr)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n')
+    .trim();
+  return text.slice(0, maxChars);
+}

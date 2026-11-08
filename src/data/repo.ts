@@ -1,4 +1,4 @@
-import type { Decision, Item } from '../types';
+import type { AiStatus, Decision, Item } from '../types';
 
 export interface Snapshot {
   items: Item[];
@@ -13,4 +13,6 @@ export interface Repo {
   subscribe(onData: (s: Snapshot) => void, onError: (e: Error) => void): () => void;
   /** null は「振り分けを取り消す（AIの初期判定に戻す）」 */
   saveDecisions(changes: Record<string, Decision | null>): Promise<void>;
+  /** AIの動作状況と今月の費用（本番のみ） */
+  subscribeAiStatus?(onData: (s: AiStatus) => void): () => void;
 }

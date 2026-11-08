@@ -1,6 +1,7 @@
 import type { Triage } from '../state/useTriage';
 import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
+import { USD_JPY } from '../lib/aiCost';
 
 export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: string; onSignOut?: () => void }) {
   return (
@@ -21,6 +22,16 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
           </button>
         ))}
       </nav>
+      {t.aiStatus && (
+        <div className="aibox">
+          <b>Claude の判定</b>
+          <div>
+            最終実行 {t.aiStatus.lastRunAt ? new Date(t.aiStatus.lastRunAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+            {t.aiStatus.judged !== undefined && `（判定 ${num(t.aiStatus.judged)}件・要約 ${num(t.aiStatus.summarized ?? 0)}件）`}
+          </div>
+          <div>今月の費用 約{num(Math.round(t.aiStatus.monthUsd * USD_JPY))}円（${t.aiStatus.monthUsd.toFixed(2)}）</div>
+        </div>
+      )}
       <div className="rulebox">
         <b>自動除外ルール</b>
         <div>・新作ゲームの案内</div>

@@ -22,6 +22,10 @@ export interface AiJudgement {
   tags: TagKey[];
   autoExclude?: string; // 例: "新作ゲーム"
   summary?: string;
+  /** 要約の要点（例: 調達額 / 10億円） */
+  points?: { label: string; value: string }[];
+  /** 判定したもの（rule-v0: キーワードによる仮判定、claude-…: Claude） */
+  by?: string;
 }
 
 /** 画面で使う記事（判定済み） */
@@ -38,4 +42,18 @@ export interface Decision {
   /** manual: 1件ずつの操作 / bulk: まとめて不要（学習には弱めに反映） */
   how: 'manual' | 'bulk';
   at: number;
+  /** 学習用：振り分けたときの記事タイトル・会社名・AIのおすすめ度 */
+  title?: string;
+  company?: string;
+  aiScore?: Score;
+}
+
+/** AIの動作状況と費用（画面の左下に表示） */
+export interface AiStatus {
+  lastRunAt?: string;
+  judged?: number;
+  summarized?: number;
+  backlog?: number;
+  /** 今月の費用（米ドル） */
+  monthUsd: number;
 }

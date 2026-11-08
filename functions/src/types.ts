@@ -7,6 +7,8 @@ export interface AiJudgement {
   tags: TagKey[];
   autoExclude?: string;
   summary?: string;
+  /** 要約の要点（例: 調達額 / 10億円） */
+  points?: { label: string; value: string }[];
   /** 判定に使ったもの（例: rule-v0、claude-xxx） */
   by: string;
 }
