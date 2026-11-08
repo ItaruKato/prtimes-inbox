@@ -45,3 +45,18 @@ describe('parse', () => {
     expect(ruleJudge({ ...base, title: '非上場株式のセミナー開催' }).tags).not.toContain('ipo');
   });
 });
+
+import { parseNewArrival } from '../src/backfill';
+describe('parseNewArrival', () => {
+  it('一覧から記事40件と次のカーソルを取る', () => {
+    const { items, next } = parseNewArrival(fx('newarrival.html'));
+    expect(items.length).toBe(40);
+    expect(next).toMatch(/^\d+_\d+$/);
+    const a = items[0];
+    expect(a.id).toMatch(/^\d+\.\d+$/);
+    expect(a.publishedAt).toMatch(/\+09:00$/);
+    expect(a.company).toBeTruthy();
+    expect(a.title).not.toMatch(/\.\.\.$/);
+    expect(new Date(a.publishedAt).getTime()).toBeGreaterThan(new Date(items[39].publishedAt).getTime() - 1);
+  });
+});

@@ -6,13 +6,13 @@ import { httpGet } from './collect';
 import type { AiJudgement, Article } from './types';
 
 /** 1回の実行で判定する上限（費用の上限にもなる） */
-export const JUDGE_LIMIT = 1500;
+export const JUDGE_LIMIT = 3000;
 /** 1回のリクエストで判定する件数 */
 export const JUDGE_CHUNK = 40;
 /** 1回の実行で要約する上限 */
-export const SUMMARY_LIMIT = 40;
-/** 判定のやり直し対象にする期間（時間） */
-const BACKLOG_HOURS = 26;
+export const SUMMARY_LIMIT = 60;
+/** 判定のやり直し対象にする期間（時間）。さかのぼって取り込んだ記事も含める */
+const BACKLOG_HOURS = 24 * 10;
 /** 判定の手本にする振り分け履歴の件数（読んだ・不要それぞれ） */
 const EXAMPLES_PER_LABEL = 30;
 
@@ -100,7 +100,7 @@ export async function enrich(deps: EnrichDeps) {
     const examples = await loadExamples(db, now());
     const chunks: Article[][] = [];
     for (let i = 0; i < toJudge.length; i += JUDGE_CHUNK) chunks.push(toJudge.slice(i, i + JUDGE_CHUNK));
-    await mapLimit(chunks, 3, async (chunk) => {
+    await mapLimit(chunks, 5, async (chunk) => {
       try {
         const { results, usage } = await judgeArticles(client, chunk, examples);
         usages.push(usage);
@@ -125,7 +125,7 @@ export async function enrich(deps: EnrichDeps) {
     .slice(0, SUMMARY_LIMIT);
   let summarized = 0;
   let summaryErrors = 0;
-  await mapLimit(toSummarize, 4, async (a) => {
+  await mapLimit(toSummarize, 6, async (a) => {
     try {
       const body = extractBody(await get(a.url));
       const { summary, usage } = await summarizeArticle(client, a, body || a.lead);

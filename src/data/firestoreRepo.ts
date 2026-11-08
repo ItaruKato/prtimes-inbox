@@ -15,7 +15,7 @@ import type { Repo } from './repo';
 import { mockJudge } from '../lib/mockJudge';
 
 /** 画面に読み込む日数（受信箱・候補・不要）。「読む」「既読」は saved から全期間読む */
-export const LOAD_DAYS = 3;
+export const LOAD_DAYS = 10;
 
 /** JST の YYYYMMDD / YYYYMMDDHH */
 export function jstKey(ts: number, len: 8 | 10): string {

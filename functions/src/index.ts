@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { collect } from './collect';
 import { cleanup } from './cleanup';
 import { enrich } from './enrich';
+import { backfill } from './backfill';
 
 initializeApp();
 const db = getFirestore();
@@ -24,10 +25,18 @@ export const collectHourly = onSchedule(
 
 /** 取得した記事を Claude で判定・要約（毎時20分。取得の後に動く） */
 export const enrichHourly = onSchedule(
-  { ...common, schedule: '20 * * * *', timeoutSeconds: 540, memory: '512MiB', secrets: [anthropicKey] },
+  { ...common, schedule: '20 * * * *', timeoutSeconds: 1200, memory: '1GiB', secrets: [anthropicKey] },
   async () => {
     const client = new Anthropic({ apiKey: anthropicKey.value() });
     await enrich({ db, client, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/** 11月1日以降の記事をさかのぼって取り込む（10分ごとに少しずつ。終わったら何もしない） */
+export const backfillPast = onSchedule(
+  { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    await backfill({ db, log: (msg, data) => logger.info(msg, data) });
   },
 );
 

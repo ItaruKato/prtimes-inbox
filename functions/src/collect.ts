@@ -40,14 +40,22 @@ export interface CollectResult {
  */
 export async function collect(deps: CollectDeps): Promise<CollectResult> {
   const get = deps.get ?? httpGet;
+  const [rssBody, sitemapBody] = await Promise.all([get(RSS_URL), get(SITEMAP_URL)]);
+  const merged = mergeRaw(parseRss(rssBody), parseNewsSitemap(sitemapBody));
+  return store(deps, [...merged.values()], 'collector');
+}
+
+/**
+ * 記事を保存する（新着取得とさかのぼり取得で共通）。
+ * 既に保存済みの記事は飛ばし、会社名は RSS・一覧 → キャッシュ → 記事ページ の順で埋める。
+ */
+export async function store(deps: CollectDeps, input: RawItem[], label: string): Promise<CollectResult> {
+  const get = deps.get ?? httpGet;
   const sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? (() => {});
   const { db } = deps;
-
-  const [rssBody, sitemapBody] = await Promise.all([get(RSS_URL), get(SITEMAP_URL)]);
-  const merged = mergeRaw(parseRss(rssBody), parseNewsSitemap(sitemapBody));
-  const raws = [...merged.values()].filter((r) => r.publishedAt && r.title);
+  const raws = input.filter((r) => r.publishedAt && r.title);
 
   // 既に保存済みの記事（会社名が埋まっているもの）は飛ばす
   const byBucket = new Map<string, RawItem[]>();
@@ -127,15 +135,22 @@ export async function collect(deps: CollectDeps): Promise<CollectResult> {
     writes.set(k, w);
   }
 
-  // 書き込み（バケットごとに items をマージ）
-  const batch = db.batch();
-  for (const [k, items] of writes) batch.set(db.collection('buckets').doc(k), { items, updatedAt: fetchedAt }, { merge: true });
+  // 書き込み（バケットごとに items をマージ。1回のバッチは500件まで）
+  const ops: ((b: FirebaseFirestore.WriteBatch) => void)[] = [];
+  for (const [k, items] of writes)
+    ops.push((b) => b.set(db.collection('buckets').doc(k), { items, updatedAt: fetchedAt }, { merge: true }));
   for (const [cid, name] of newCompanies)
-    if (!companyCache.has(cid)) batch.set(db.collection('companies').doc(cid), { name, updatedAt: fetchedAt });
-  batch.set(db.collection('meta').doc('collector'), { lastRunAt: fetchedAt, seen: raws.length, added, updated }, { merge: true });
-  await batch.commit();
+    if (!companyCache.has(cid)) ops.push((b) => b.set(db.collection('companies').doc(cid), { name, updatedAt: fetchedAt }));
+  ops.push((b) =>
+    b.set(db.collection('meta').doc(label), { lastRunAt: fetchedAt, seen: raws.length, added, updated }, { merge: true }),
+  );
+  for (let i = 0; i < ops.length; i += 450) {
+    const batch = db.batch();
+    for (const op of ops.slice(i, i + 450)) op(batch);
+    await batch.commit();
+  }
 
   const result = { seen: raws.length, added, updated, pageFetches, missingCompany };
-  log('collect done', { ...result });
+  log(`${label} done`, { ...result });
   return result;
 }
