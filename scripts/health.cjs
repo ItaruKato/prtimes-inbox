@@ -58,6 +58,25 @@ const jst = (ms, len) => {
       if (a.publishedAt > latest) latest = a.publishedAt;
     }
   }
+  // 画面の「不要」（新作ゲーム）判定と同じ条件で数える：Claude の過去の判定 or キーワード
+  const { ruleJudge } = require(path.join(__dirname, '..', 'functions', 'lib', 'judge.js'));
+  let gameByAi = 0;
+  let gameByRule = 0;
+  let game = 0;
+  const gameSamples = [];
+  for (const d of snap.docs)
+    for (const a of Object.values(d.data().items ?? {})) {
+      const ai = a.ai?.autoExclude === '新作ゲーム';
+      const rule = ruleJudge({ title: a.title, lead: a.lead ?? '', keywords: a.keywords ?? [], ticker: a.ticker ?? '', section: a.section ?? '' }).autoExclude === '新作ゲーム';
+      if (ai) gameByAi++;
+      if (rule) gameByRule++;
+      if (ai || rule) {
+        game++;
+        if (gameSamples.length < 25) gameSamples.push(`${ai ? 'AI' : '  '}${rule ? 'KW' : '  '} ${a.title.slice(0, 60)}｜${a.company}｜kw=${(a.keywords ?? []).slice(0, 4).join(',')}`);
+      }
+    }
+  log(`新作ゲーム扱い（不要に入る）: ${game}件（Claude ${gameByAi} / キーワード ${gameByRule}）`);
+  log(gameSamples.join('\n'));
   log(`buckets(10日): ${snap.size}件のドキュメント / 記事 ${total}件 / 最新の配信 ${latest}`);
   log(`日別: ${JSON.stringify(perDay)}`);
   log(`判定者: ${JSON.stringify(byModel)}`);

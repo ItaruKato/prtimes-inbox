@@ -20,7 +20,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: functions/package-lock.json
-      - run: npm ci
+      - run: npm ci && npm run build
         working-directory: functions
       - uses: google-github-actions/auth@v2
         with:
