@@ -60,6 +60,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
       const unsubs = [
         onSnapshot(
           query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 10))),
+          // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
+          { includeMetadataChanges: true },
           (snap) => {
             // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
             if (snap.metadata.fromCache && snap.empty) return;
@@ -71,6 +73,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
         ),
         onSnapshot(
           query(collection(db, 'decisions'), where(documentId(), '>=', jstKey(since, 8))),
+          // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
+          { includeMetadataChanges: true },
           (snap) => {
             // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
             if (snap.metadata.fromCache && snap.empty) return;
@@ -82,6 +86,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
         ),
         onSnapshot(
           collection(db, 'saved'),
+          // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
+          { includeMetadataChanges: true },
           (snap) => {
             // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
             if (snap.metadata.fromCache && snap.empty) return;
