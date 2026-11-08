@@ -61,6 +61,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
         onSnapshot(
           query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 10))),
           (snap) => {
+            // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
+            if (snap.metadata.fromCache && snap.empty) return;
             buckets = new Map(snap.docs.map((d) => [d.id, (d.data().items ?? {}) as Record<string, Article>]));
             ready.buckets = true;
             emit();
@@ -70,6 +72,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
         onSnapshot(
           query(collection(db, 'decisions'), where(documentId(), '>=', jstKey(since, 8))),
           (snap) => {
+            // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
+            if (snap.metadata.fromCache && snap.empty) return;
             dayDecisions = new Map(snap.docs.map((d) => [d.id, (d.data().d ?? {}) as Record<string, Decision>]));
             ready.decisions = true;
             emit();
@@ -79,6 +83,8 @@ export function createFirestoreRepo(db: Firestore): Repo {
         onSnapshot(
           collection(db, 'saved'),
           (snap) => {
+            // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
+            if (snap.metadata.fromCache && snap.empty) return;
             saved = new Map(snap.docs.map((d) => [d.id, d.data() as SavedDoc]));
             ready.saved = true;
             emit();
