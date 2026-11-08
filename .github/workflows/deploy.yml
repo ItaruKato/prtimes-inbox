@@ -13,7 +13,7 @@ permissions:
 env:
   PROJECT_ID: prtimes-inbox
   # scripts/setup-gcp.sh の最後に表示される番号（秘密情報ではない）。空のあいだはデプロイしない
-  PROJECT_NUMBER: ''
+  PROJECT_NUMBER: '723210521199'
 
 jobs:
   build:
