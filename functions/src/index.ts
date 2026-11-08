@@ -23,11 +23,17 @@ export const collectHourly = onSchedule(
   },
 );
 
-/** 取得した記事を Claude で判定・要約（毎時20分。取得の後に動く） */
+/**
+ * 取得した記事を Claude で判定・要約（20分ごと：毎時10分・30分・50分。10分の回は取得（5分）の直後）。
+ * 1回あたりの同時リクエストは少なめにして、短い間隔で回数を増やす（利用上限に当たりにくく、たまった分も早く減る）。
+ * 1回は約10分で新しいリクエストを送るのをやめる。重なったときは locks/enrich で後の回が何もしない。
+ * 関数名は以前のまま（変えるとデプロイで消して作り直しになるため）。
+ */
 export const enrichHourly = onSchedule(
-  { ...common, schedule: '20 * * * *', timeoutSeconds: 1200, memory: '1GiB', secrets: [anthropicKey] },
+  { ...common, schedule: '10,30,50 * * * *', timeoutSeconds: 1200, memory: '1GiB', secrets: [anthropicKey] },
   async () => {
-    const client = new Anthropic({ apiKey: anthropicKey.value() });
+    // 429（利用上限）・529（混雑）は SDK が retry-after に従って2回までやり直す。応答が止まったときは 150 秒で打ち切る
+    const client = new Anthropic({ apiKey: anthropicKey.value(), maxRetries: 2, timeout: 150_000 });
     await enrich({ db, client, log: (msg, data) => logger.info(msg, data) });
   },
 );
@@ -41,7 +47,7 @@ export const backfillPast = onSchedule(
 );
 
 /** 毎日4時に古いデータを削除（「読む」「既読」に入れた記事は saved に残るので消えない） */
-export const cleanupDaily = onSchedule({ ...common, schedule: '0 4 * * *' }, async () => {
+export const cleanupDaily = onSchedule({ ...common, schedule: '0 4 * * *', timeoutSeconds: 300 }, async () => {
   const r = await cleanup(db, new Date());
   logger.info('cleanup done', r);
 });

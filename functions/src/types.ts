@@ -11,6 +11,8 @@ export interface AiJudgement {
   points?: { label: string; value: string }[];
   /** 判定に使ったもの（例: rule-v0、claude-xxx） */
   by: string;
+  /** Claude が判定を断った記事（ルール判定のまま残し、何度もやり直さない） */
+  skipped?: string;
 }
 
 /** Firestore の buckets/{YYYYMMDDHH}.items.{id} に保存する記事 */

@@ -1,1 +1,10 @@
-{ "indexes": [], "fieldOverrides": [] }
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "buckets",
+      "fieldPath": "items",
+      "indexes": []
+    }
+  ]
+}

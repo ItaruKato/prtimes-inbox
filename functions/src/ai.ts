@@ -9,6 +9,11 @@ export const JUDGE_MODEL = 'claude-haiku-5-5';
 /** おすすめ度「高」の記事の要約（件数が少ないので最高精度のモデル） */
 export const SUMMARY_MODEL = 'claude-opus-5-5';
 
+/** 保存する判定理由・要約・要点の長さの上限 */
+const REASON_MAX = 60;
+const SUMMARY_MAX = 400;
+const POINTS_MAX = 8;
+
 const TAG_KEYS = ['fund', 'ipo', 'ma', 'new', 'mkt'] as const;
 
 const JudgeOutput = z.object({
@@ -100,12 +105,15 @@ const usageOf = (model: string, u: { input_tokens: number; output_tokens: number
   cacheRead: u.cache_read_input_tokens ?? 0,
 });
 
-/** 記事をまとめて判定する。拒否・失敗したものは結果に含めない（呼び出し側でルール判定のまま残す） */
+/**
+ * 記事をまとめて判定する。拒否・失敗したものは結果に含めない（呼び出し側でルール判定のまま残す）。
+ * refused: 拒否された、または出力が読み取れなかった（呼び出し側で件数を分けてやり直す）
+ */
 export async function judgeArticles(
   client: Anthropic,
   articles: Article[],
   examples: Example[],
-): Promise<{ results: Map<string, AiJudgement>; usage: Usage }> {
+): Promise<{ results: Map<string, AiJudgement>; usage: Usage; refused: boolean }> {
   const input = articles.map((a) => ({
     id: a.id,
     title: a.title,
@@ -129,20 +137,21 @@ export async function judgeArticles(
   });
   const usage = usageOf(JUDGE_MODEL, response.usage);
   const results = new Map<string, AiJudgement>();
-  if (response.stop_reason === 'refusal' || !response.parsed_output) return { results, usage };
+  if (response.stop_reason === 'refusal' || !response.parsed_output) return { results, usage, refused: true };
   const ids = new Set(articles.map((a) => a.id));
   for (const r of response.parsed_output.results) {
     if (!ids.has(r.id)) continue;
     const exclude = r.exclude.trim();
     results.set(r.id, {
       score: exclude ? 'low' : r.score,
-      reason: r.reason,
+      // 保存するドキュメントが大きくなりすぎないように長さを抑える（指示は20字以内）
+      reason: r.reason.slice(0, REASON_MAX),
       tags: [...new Set(r.tags)],
       ...(exclude ? { autoExclude: exclude } : {}),
       by: JUDGE_MODEL,
     });
   }
-  return { results, usage };
+  return { results, usage, refused: false };
 }
 
 export const SUMMARY_SYSTEM = `あなたは事業会社の担当者のためにプレスリリースを要約するアシスタントです。
@@ -178,5 +187,13 @@ export async function summarizeArticle(
   });
   const usage = usageOf(response.model ?? SUMMARY_MODEL, response.usage);
   if (response.stop_reason === 'refusal' || !response.parsed_output) return { usage };
-  return { summary: response.parsed_output, usage };
+  // 保存するドキュメントが大きくなりすぎないように長さを抑える（buckets.ts の余裕の前提）
+  const o = response.parsed_output;
+  return {
+    summary: {
+      summary: o.summary.slice(0, SUMMARY_MAX),
+      points: o.points.slice(0, POINTS_MAX).map((p) => ({ label: p.label.slice(0, 30), value: p.value.slice(0, 120) })),
+    },
+    usage,
+  };
 }

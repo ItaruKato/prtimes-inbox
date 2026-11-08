@@ -13,13 +13,22 @@ export async function cleanup(db: Firestore, now: Date) {
   const limit = new Date(now.getTime() - RETENTION_DAYS * 86400e3);
   let deleted = 0;
   for (const [col, len] of [['buckets', 10], ['decisions', 8]] as const) {
-    const old = await db.collection(col).where('__name__', '<', db.collection(col).doc(jstKey(limit, len))).get();
-    for (let i = 0; i < old.docs.length; i += 400) {
+    // ドキュメントの中身は読まない（select()）。何日分もたまっていてもメモリに収まるよう、400件ずつ消す
+    // buckets の続きのドキュメント（YYYYMMDDHH_2 など）も、名前の大小比較で同じ時間の本体と一緒に消える
+    const q = db
+      .collection(col)
+      .where('__name__', '<', db.collection(col).doc(jstKey(limit, len)))
+      .select()
+      .limit(400);
+    for (;;) {
+      const old = await q.get();
+      if (old.empty) break;
       const batch = db.batch();
-      for (const d of old.docs.slice(i, i + 400)) batch.delete(d.ref);
+      for (const d of old.docs) batch.delete(d.ref);
       await batch.commit();
+      deleted += old.size;
+      if (old.size < 400) break;
     }
-    deleted += old.size;
   }
   return { deleted, before: jstKey(limit, 10) };
 }
