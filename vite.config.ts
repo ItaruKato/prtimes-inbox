@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // 登録は src/main.tsx の registerSW で行う（更新時に自動で再読み込みする）
+      injectRegister: false,
+      workbox: { clientsClaim: true, skipWaiting: true, navigateFallbackDenylist: [/^\/__/] },
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'PR Times Watcher',

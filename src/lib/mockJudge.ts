@@ -12,14 +12,36 @@ const RULES: { k: TagKey; re: RegExp }[] = [
   { k: 'new', re: /新規事業|新事業|事業を開始|事業開始|参入|新会社|会社を設立|設立のお知らせ|立ち上げ|新ブランド|新サービス|提供開始|ローンチ/ },
   { k: 'mkt', re: /マーケティング|広告|販促|プロモーション|ブランディング|SNS|インフルエンサー|集客|CRM|リード獲得|D2C|PR戦略|調査レポート|意識調査|実態調査/ },
 ];
-const GAME_RE = /新作ゲーム|ゲームアプリ|事前登録|Steam|Nintendo Switch|ニンテンドースイッチ|Switch 2|PS5|PlayStation|プレイステーション|ガチャ|RPG|ゲーム.{0,8}(配信|リリース|発売)|(配信|リリース|発売).{0,8}ゲーム/;
+/**
+ * 新作ゲームの案内か（タイトルで判定）。
+ * 「ガチャ」「Switch」などの単語だけでは判定しない（飲食店のガチャ企画や、景品に Switch が当たるキャンペーンを誤って除外していたため）。
+ */
+const GAME_RE = new RegExp(
+  [
+    '新作ゲーム',
+    'ゲームアプリ',
+    'スマホゲーム',
+    'ソーシャルゲーム',
+    'ブラウザゲーム',
+    '事前登録',
+    '(?<![A-Za-z])(RPG|MMORPG|SLG)(?![A-Za-z])',
+    'ゲーム[^。]{0,12}(配信|リリース|発売|アップデート|正式サービス|ダウンロード)',
+    '(配信|リリース|発売|正式サービス)[^。]{0,12}ゲーム',
+    '(Steam|Nintendo Switch|Switch 2|ニンテンドースイッチ|PS5|PS4|PlayStation|プレイステーション|Xbox)[^。]{0,15}(版|向け|ソフト|対応|配信|発売|リリース)',
+    '(ゲーム|RPG)[^。]{0,40}ガチャ',
+    'ピックアップガチャ',
+  ].join('|'),
+);
+// 景品・プレゼントとしてゲーム機が出てくるだけの記事は除外しない
+const PRIZE_RE = /当たる|プレゼント|抽選/;
 
 export function mockJudge(a: Article): AiJudgement {
   const text = a.title + ' ' + a.lead.slice(0, 160);
   const tags = RULES.filter((r) => r.re.test(text)).map((r) => r.k);
   const strongTag = tags.find((t) => t === 'fund' || t === 'ipo' || t === 'ma');
   const softTag = tags.find((t) => t === 'new' || t === 'mkt');
-  const isGame = (GAME_RE.test(a.title) || a.keywords.some((k) => /ゲーム/.test(k))) && !strongTag;
+  const titleGame = GAME_RE.test(a.title) && !(PRIZE_RE.test(a.title) && !/新作|配信開始|事前登録|リリース/.test(a.title));
+  const isGame = (titleGame || a.keywords.some((k) => /ゲーム/.test(k))) && !strongTag;
   const mgmt = /経営情報/.test(a.section);
 
   let score: Score = 'low';

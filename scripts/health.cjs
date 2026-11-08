@@ -66,7 +66,7 @@ const jst = (ms, len) => {
   const gameSamples = [];
   for (const d of snap.docs)
     for (const a of Object.values(d.data().items ?? {})) {
-      const ai = a.ai?.autoExclude === '新作ゲーム';
+      const ai = String(a.ai?.by ?? '').startsWith('claude') && a.ai?.autoExclude === '新作ゲーム';
       const rule = ruleJudge({ title: a.title, lead: a.lead ?? '', keywords: a.keywords ?? [], ticker: a.ticker ?? '', section: a.section ?? '' }).autoExclude === '新作ゲーム';
       if (ai) gameByAi++;
       if (rule) gameByRule++;
