@@ -24,3 +24,6 @@ logs
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code の作業用（サブエージェントのワークツリーなど）
+.claude/worktrees/
