@@ -25,7 +25,7 @@ gcloud firestore databases describe --database='(default)' >/dev/null 2>&1 \
 
 echo "== デプロイ用サービスアカウント"
 gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \
-  || gcloud iam service-accounts create "$SA_NAME" --display-name="GitHub Actions deploy"
+  || { gcloud iam service-accounts create "$SA_NAME" --display-name="GitHub Actions deploy"; echo "（反映待ち 30秒）"; sleep 30; }
 for ROLE in roles/editor roles/firebase.admin roles/cloudfunctions.admin roles/run.admin roles/iam.serviceAccountUser; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA" --role="$ROLE" --condition=None --quiet >/dev/null
 done
