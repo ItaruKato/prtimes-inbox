@@ -18,6 +18,11 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // 除外ルールの週次集計（GitHub Actions の rule-report が書く）
+    match /ruleReports/{week} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
     match /aiUsage/{day} {
       allow read: if isOwner();
       allow write: if false;
