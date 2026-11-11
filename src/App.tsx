@@ -13,6 +13,7 @@ import { ArticleList } from './components/ArticleList';
 import { DetailPane } from './components/DetailPane';
 import { TabBar } from './components/TabBar';
 import { ToastView } from './components/ToastView';
+import { JudgePage } from './components/JudgePage';
 const ReviewPage = lazy(() => import('./components/ReviewPage').then((m) => ({ default: m.ReviewPage })));
 
 // ?stress=1 で 3,000件/日×2日 の負荷テスト用データ
@@ -70,6 +71,8 @@ function Inbox({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.matches('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+      // 判定・点検の画面では、それぞれの画面のキー操作を使う
+      if (t.page !== 'triage') return;
       const v = t.visible;
       const i = v.findIndex((x) => x.id === t.sel);
       const k = e.key.toLowerCase();
@@ -94,10 +97,12 @@ function Inbox({
   const dataLabel = t.error ? `読み込みエラー：${t.error}` : t.loading ? '読み込み中…' : source(t.items.length.toLocaleString('ja-JP'));
 
   return (
-    <div className={t.page === 'review' ? 'app reviewing' : 'app'}>
+    <div className={t.page === 'triage' ? 'app' : 'app reviewing'}>
       <Sidebar t={t} dataLabel={dataLabel} onSignOut={onSignOut} />
       <section className="main">
-        {t.page === 'review' ? (
+        {t.page === 'judge' ? (
+          <JudgePage t={t} />
+        ) : t.page === 'review' ? (
           <Suspense fallback={<div className="empty">読み込み中…</div>}>
             <ReviewPage t={t} />
           </Suspense>

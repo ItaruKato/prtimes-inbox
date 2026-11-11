@@ -72,7 +72,7 @@ export function useTriage(repo: Repo) {
   const [reports, setReports] = useState<RuleReport[]>([]);
   useEffect(() => repo.subscribeRuleReports(setReports), [repo]);
   /** 表示中の画面（振り分け／ルールの点検） */
-  const [page, setPage] = useState<'triage' | 'review'>('triage');
+  const [page, setPage] = useState<'triage' | 'review' | 'judge'>('triage');
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(
@@ -197,10 +197,14 @@ export function useTriage(repo: Repo) {
     [repo],
   );
 
+  /**
+   * 振り分ける。元に戻す関数を返す。
+   * opts.reasonTags: 不要の理由（判定画面で選んだもの）／ opts.quiet: 通知を出さない（判定画面は自分で出す）
+   */
   const setStatus = useCallback(
-    (id: string, status: Status) => {
+    (id: string, status: Status, opts: { reasonTags?: string[]; quiet?: boolean } = {}): (() => void) | undefined => {
       const it = byId.get(id);
-      if (!it) return;
+      if (!it) return undefined;
       // AIの初期判定と同じ場所に戻す場合は記録を消す
       const prev = dec[it.id];
       const change: Decision | null =
@@ -217,13 +221,16 @@ export function useTriage(repo: Repo) {
               // 不要のまま操作し直したときは、書いた理由を残す
               ...(status === 'drop' && prev?.reason ? { reason: prev.reason } : {}),
               ...(status === 'drop' && prev?.reasonTags?.length ? { reasonTags: prev.reasonTags } : {}),
+              ...(status === 'drop' && opts.reasonTags?.length ? { reasonTags: opts.reasonTags } : {}),
             };
       const undo = apply({ [id]: change });
-      showToast(
-        LABEL[status],
-        undo,
-        status === 'drop' ? { label: '理由を書く', run: () => setSel(id) } : undefined,
-      );
+      if (!opts.quiet)
+        showToast(
+          LABEL[status],
+          undo,
+          status === 'drop' ? { label: '理由を書く', run: () => setSel(id) } : undefined,
+        );
+      return undo;
     },
     [byId, dec, disabled, apply, showToast],
   );
