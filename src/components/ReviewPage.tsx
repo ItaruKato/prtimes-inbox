@@ -111,7 +111,7 @@ export function ReviewPage({ t }: { t: Triage }) {
       <article className="rulecard">
         <h2>取りこぼし候補</h2>
         <p className="muted small">
-          理由を書いて不要にしたのに、どのルールにも当たらなかった記事です。同じ種類が3件以上たまると、毎晩の見直しで新しいルールになります。
+          理由を書いて不要にしたのに、どのルールにも当たらなかった記事です。同じ種類が10件以上たまると、毎晩の見直しで新しいルールになります。
         </p>
         <Uncovered title="今週" r={current} />
         <Uncovered title="先週" r={latestComplete} />
