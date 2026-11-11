@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import type { Triage } from '../state/useTriage';
 import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
@@ -16,25 +15,21 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
       </div>
       <nav className="navgroup" aria-label="振り分け">
         <div className="navlabel">振り分け</div>
+        <button className="nav" type="button" aria-current={t.page === 'judge'} onClick={() => t.setPage('judge')}>
+          <span>
+            判定
+            <small className="navnote">1件ずつ 読む／不要</small>
+          </span>
+          <span className="n">⇆</span>
+        </button>
         {VIEWS.map((v) => (
-          <Fragment key={v.k}>
-            <button className="nav" type="button" aria-current={t.page === 'triage' && t.view === v.k} onClick={() => { t.setPage('triage'); t.setView(v.k); }}>
-              <span>
-                {v.label}
-                {v.note && <small className="navnote">{v.note}</small>}
-              </span>
-              <span className="n">{num(t.counts[v.k])}</span>
-            </button>
-            {v.k === 'inbox' && (
-              <button className="nav" type="button" aria-current={t.page === 'judge'} onClick={() => t.setPage('judge')}>
-                <span>
-                  判定
-                  <small className="navnote">1件ずつ 読む／不要</small>
-                </span>
-                <span className="n">⇆</span>
-              </button>
-            )}
-          </Fragment>
+          <button key={v.k} className="nav" type="button" aria-current={t.page === 'triage' && t.view === v.k} onClick={() => { t.setPage('triage'); t.setView(v.k); }}>
+            <span>
+              {v.label}
+              {v.note && <small className="navnote">{v.note}</small>}
+            </span>
+            <span className="n">{num(t.counts[v.k])}</span>
+          </button>
         ))}
       </nav>
       {t.aiStatus && (

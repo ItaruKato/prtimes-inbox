@@ -72,7 +72,8 @@ export function useTriage(repo: Repo) {
   const [reports, setReports] = useState<RuleReport[]>([]);
   useEffect(() => repo.subscribeRuleReports(setReports), [repo]);
   /** 表示中の画面（振り分け／ルールの点検） */
-  const [page, setPage] = useState<'triage' | 'review' | 'judge'>('triage');
+  // 起動時は「判定」から始める
+  const [page, setPage] = useState<'triage' | 'review' | 'judge'>('judge');
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(

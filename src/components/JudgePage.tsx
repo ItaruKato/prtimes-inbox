@@ -5,6 +5,7 @@ import { TAGS } from '../lib/tags';
 import { REASON_PRESETS } from '../lib/exclusion';
 import { fullDate, num } from '../lib/format';
 import { TagPills } from './TagPills';
+import { NotifyBox } from './NotifyBox';
 
 const LS_ORDER = 'prt-judge-order';
 const SWIPE = 90; // これ以上ずらしたら判定する（px）
@@ -105,6 +106,9 @@ export function JudgePage({ t }: { t: Triage }) {
 
   return (
     <section className="judge" aria-label="判定">
+      <div className="phoneonly">
+        <NotifyBox banner />
+      </div>
       <header className="judgehead">
         <div className="judgestats">
           <b>判定</b>
