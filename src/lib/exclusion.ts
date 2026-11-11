@@ -1,5 +1,5 @@
 import type { Article } from '../types';
-import { mockJudge } from './mockJudge';
+import { isGameArticle } from './mockJudge';
 
 /**
  * 自動で「不要」に入れるルール。
@@ -19,8 +19,7 @@ export interface ExclusionRule {
 
 /** 新作ゲームの案内か（Claude の過去の判定、またはキーワードによる判定） */
 export const isGame = (a: Article): boolean =>
-  (a.ai?.by?.startsWith('claude') === true && a.ai.autoExclude === '新作ゲーム') ||
-  mockJudge(a).autoExclude === '新作ゲーム';
+  (a.ai?.by?.startsWith('claude') === true && a.ai.autoExclude === '新作ゲーム') || isGameArticle(a);
 
 /**
  * タイトルの正規表現で判定するルールを作る（毎日の見直しで足すルールは基本これを使う）。

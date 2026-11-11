@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Item, Status } from '../types';
 import type { Triage } from '../state/useTriage';
-import { dayKey, num } from '../lib/format';
+import { dayKey, hm, num } from '../lib/format';
+import { tagLabel } from '../lib/tags';
 import { ArticleRow } from './ArticleRow';
 import { AI_SCORING } from '../lib/flags';
 import { activeRule } from '../state/useTriage';
@@ -54,7 +55,40 @@ export function ArticleList({ t }: { t: Triage }) {
     return m;
   }, [visible]);
 
-  if (t.loading) return <div className="list"><div className="empty">読み込み中…</div></div>;
+  if (t.loading) {
+    if (!t.preview || view !== 'inbox' || !t.preview.rows.length)
+      return <div className="list"><div className="empty">読み込み中…</div></div>;
+    let day = '';
+    return (
+      <div className="list" aria-busy="true">
+        <div className="previewnote">前回の受信箱を表示しています（最新を読み込み中…）</div>
+        {t.preview.rows.map((r) => {
+          const k = dayKey(r.ts);
+          const head = k !== day;
+          day = k;
+          return (
+            <Fragment key={r.id}>
+              {head && <div className="day">{k}</div>}
+              <div className="rowwrap">
+                <div className="row preview">
+                  <div className="time">{hm(r.ts)}</div>
+                  <div className="body">
+                    <span className="title">{r.t}</span>
+                    <span className="sub">
+                      <span className="company">{r.c}</span>
+                      {r.g.map((g) => (
+                        <span key={g} className={`tag ${g}`}>{tagLabel(g)}</span>
+                      ))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Fragment>
+          );
+        })}
+      </div>
+    );
+  }
   // スマホでは左の欄（エラー表示）が出ないので、一覧にも出す
   if (t.error && !t.items.length)
     return <div className="list"><div className="empty"><b>読み込めませんでした</b>{t.error}</div></div>;

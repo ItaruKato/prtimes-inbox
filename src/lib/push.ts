@@ -1,4 +1,3 @@
-import { deleteToken, getMessaging, getToken } from 'firebase/messaging';
 import { deleteDoc, doc, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
 import type { FirebaseApp } from 'firebase/app';
 
@@ -38,6 +37,7 @@ export async function enablePush(app: FirebaseApp, db: Firestore): Promise<PushS
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') return perm === 'denied' ? 'denied' : 'off';
   const reg = await navigator.serviceWorker.ready;
+  const { getMessaging, getToken } = await import('firebase/messaging');
   const token = await getToken(getMessaging(app), { serviceWorkerRegistration: reg });
   if (!token) throw new Error('通知の登録に失敗しました');
   await setDoc(doc(db, 'pushTokens', await sha256(token)), {
@@ -59,6 +59,7 @@ export async function disablePush(app: FirebaseApp, db: Firestore): Promise<Push
   const token = savedToken();
   if (token) {
     await deleteDoc(doc(db, 'pushTokens', await sha256(token))).catch(() => {});
+    const { deleteToken, getMessaging } = await import('firebase/messaging');
     await deleteToken(getMessaging(app)).catch(() => {});
   }
   try {

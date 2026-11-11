@@ -35,6 +35,19 @@ const GAME_RE = new RegExp(
 // 景品・プレゼントとしてゲーム機が出てくるだけの記事は除外しない
 const PRIZE_RE = /当たる|プレゼント|抽選/;
 
+const STRONG_RE = new RegExp(RULES.filter((r) => r.k === 'fund' || r.k === 'ipo' || r.k === 'ma').map((r) => r.re.source).join('|'));
+const NEW_GAME_RE = /新作|配信開始|事前登録|リリース/;
+
+/**
+ * 新作ゲームの案内か（タイトル・キーワード・本文の冒頭で判定）。mockJudge と同じ結果を、少ない計算で出す。
+ * 資金調達・上場・M&A に当たる記事は除外しない。
+ */
+export function isGameArticle(a: Pick<Article, 'title' | 'lead' | 'keywords'>): boolean {
+  const titleGame = GAME_RE.test(a.title) && !(PRIZE_RE.test(a.title) && !NEW_GAME_RE.test(a.title));
+  if (!titleGame && !a.keywords.some((k) => /ゲーム/.test(k))) return false;
+  return !STRONG_RE.test(a.title + ' ' + a.lead.slice(0, 160));
+}
+
 export function mockJudge(a: Article): AiJudgement {
   const text = a.title + ' ' + a.lead.slice(0, 160);
   const tags = RULES.filter((r) => r.re.test(text)).map((r) => r.k);

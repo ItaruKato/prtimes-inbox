@@ -3,6 +3,7 @@ import {
   deleteField,
   doc,
   documentId,
+  getDocs,
   setDoc,
   onSnapshot,
   query,
@@ -16,6 +17,7 @@ import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
 import { rangeStart, type RangeKey } from '../lib/range';
+import { fromEntry, type IndexEntry } from '../lib/dayIndex';
 
 /** JST の YYYYMMDD / YYYYMMDDHH */
 export function jstKey(ts: number, len: 8 | 10): string {
@@ -36,42 +38,70 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
   /** saved にドキュメントがある記事（無い記事に削除を送らないため） */
   const savedIds = new Set<string>();
 
+  /** 開いた記事の全データ（本文の冒頭・要約・キーワードなど）。一覧は目次だけで動くので、開いたときに読む */
+  const fullCache = new Map<string, Article>();
+
   return {
     subscribe(onData, onError) {
       const since = rangeStart(range);
-      let buckets = new Map<string, Record<string, Article>>();
+      /** 目次ドキュメントごとの記事（新しい順）。変わったドキュメントだけ作り直す */
+      const dayItems = new Map<string, Item[]>();
       let dayDecisions = new Map<string, Record<string, Decision>>();
       let saved = new Map<string, SavedDoc>();
-      const ready = { buckets: false, decisions: false, saved: false };
+      const ready = { days: false, decisions: false, saved: false };
 
       const emit = () => {
-        if (!ready.buckets || !ready.decisions || !ready.saved) return;
+        if (!ready.days || !ready.decisions || !ready.saved) return;
         byId.clear();
-        for (const items of buckets.values()) for (const a of Object.values(items)) byId.set(a.id, toItem(a));
+        // 目次ドキュメントのIDは時間順に並ぶので、新しいドキュメントから順に並べれば全体も新しい順になる
+        const items: Item[] = [];
+        for (const k of [...dayItems.keys()].sort().reverse())
+          for (const it of dayItems.get(k)!) {
+            if (byId.has(it.id)) continue;
+            byId.set(it.id, it);
+            items.push(it);
+          }
         const decisions: Record<string, Decision> = {};
+        let extra = false;
         for (const [id, s] of saved) {
-          if (!byId.has(id)) byId.set(id, toItem(s.article));
+          if (!byId.has(id)) {
+            const it = toItem(s.article);
+            byId.set(id, it);
+            items.push(it);
+            extra = true;
+          }
           decisions[id] = s.decision;
         }
         for (const m of dayDecisions.values()) Object.assign(decisions, m);
-        const items = [...byId.values()].sort((a, b) => b.ts - a.ts);
+        if (extra) items.sort((x, y) => y.ts - x.ts);
         onData({ items, decisions });
       };
       const fail = (e: Error) => onError(e);
 
       const unsubs = [
         onSnapshot(
-          // 開始位置を日単位にそろえ、同じ日のうちは同じクエリにする（開き直しても差分だけ受け取る）
           since === null
-            ? collection(db, 'buckets')
-            : query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 8) + '00')),
+            ? collection(db, 'days')
+            : query(collection(db, 'days'), where(documentId(), '>=', jstKey(since, 8))),
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
             // 端末内のキャッシュが空のときは、サーバーの結果を待つ（一瞬「0件」と出さない）
             if (snap.metadata.fromCache && snap.empty) return;
-            buckets = new Map(snap.docs.map((d) => [d.id, (d.data().items ?? {}) as Record<string, Article>]));
-            ready.buckets = true;
+            const changes = snap.docChanges();
+            // 中身が変わっていない通知（キャッシュ→サーバーの確認だけ）は、作り直さない
+            if (!changes.length && ready.days) return;
+            for (const c of changes) {
+              if (c.type === 'removed') {
+                dayItems.delete(c.doc.id);
+                continue;
+              }
+              const entries = (c.doc.data().items ?? {}) as Record<string, IndexEntry>;
+              const list = Object.entries(entries).map(([id, e]) => toItem(fromEntry(id, e)));
+              list.sort((x, y) => y.ts - x.ts);
+              dayItems.set(c.doc.id, list);
+            }
+            ready.days = true;
             emit();
           },
           fail,
@@ -85,6 +115,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
           (snap) => {
             // 0件は普通にある。キャッシュの0件も受け取る（オフラインで開いたとき止まらないように）。
             // 一度も同期していない端末では、SDK がサーバーの結果を待ってから届けるので「0件」は一瞬も出ない
+            if (!snap.docChanges().length && ready.decisions) return;
             dayDecisions = new Map(snap.docs.map((d) => [d.id, (d.data().d ?? {}) as Record<string, Decision>]));
             ready.decisions = true;
             emit();
@@ -97,6 +128,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
           { includeMetadataChanges: true },
           (snap) => {
             // 0件は普通にある（「読む」「既読」が空）。キャッシュの0件も受け取る（上と同じ理由）
+            if (!snap.docChanges().length && ready.saved) return;
             saved = new Map(snap.docs.map((d) => [d.id, d.data() as SavedDoc]));
             savedIds.clear();
             for (const id of saved.keys()) savedIds.add(id);
@@ -107,6 +139,24 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         ),
       ];
       return () => unsubs.forEach((u) => u());
+    },
+
+    async loadArticle(id, publishedAt) {
+      const hit = fullCache.get(id);
+      if (hit) return hit;
+      // 記事本体は buckets/{JSTのYYYYMMDDHH}（多い時間は _2, _3… に続く）にある
+      const key = jstKey(new Date(publishedAt).getTime(), 10);
+      const snap = await getDocs(
+        query(collection(db, 'buckets'), where(documentId(), '>=', key), where(documentId(), '<', key + '`')),
+      );
+      for (const d of snap.docs) {
+        const a = (d.data().items ?? {})[id] as Article | undefined;
+        if (a) {
+          fullCache.set(id, a);
+          return a;
+        }
+      }
+      return null;
     },
 
     subscribeAiStatus(onData) {
@@ -181,9 +231,11 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         perDay.set(day, m);
         const savedRef = doc(db, 'saved', id);
         if (d && (d.status === 'keep' || d.status === 'done')) {
-          const { ts: _ts, judge: _judge, ...article } = it;
+          const { ts: _ts, judge: _judge, rules: _rules, ...compact } = it;
           void _ts;
           void _judge;
+          void _rules;
+          const article = fullCache.get(id) ?? compact;
           ops.push((b) => b.set(savedRef, { article, decision: d }));
           savedIds.add(id);
         } else if (savedIds.has(id)) {

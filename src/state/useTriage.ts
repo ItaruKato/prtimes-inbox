@@ -19,6 +19,22 @@ export function defaultStatus(it: Item, disabled: ReadonlySet<string> = new Set(
   return it.judge.score === 'high' ? 'inbox' : it.judge.score === 'mid' ? 'cand' : 'drop';
 }
 
+/** 起動直後に出す「前回の受信箱」（端末に保存。最新を読み込むまでのつなぎ） */
+export interface Preview {
+  savedAt: number;
+  rows: { id: string; t: string; c: string; ts: number; g: TagKey[] }[];
+  counts: Record<Status, number>;
+}
+const PREVIEW_KEY = 'prt-preview-v1';
+function loadPreview(): Preview | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREVIEW_KEY) || 'null') as Preview | null;
+    return p && Array.isArray(p.rows) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface Toast {
   id: number;
   text: string;
@@ -47,6 +63,7 @@ export function useTriage(repo: Repo) {
   const toastSeq = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
+  const [preview] = useState<Preview | null>(loadPreview);
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   useEffect(() => repo.subscribeAiStatus?.(setAiStatus), [repo]);
   const [config, setConfig] = useState<ExclusionConfig>({ disabledRules: [] });
@@ -94,6 +111,25 @@ export function useTriage(repo: Repo) {
     }
     return { counts, tagCounts, visible };
   }, [items, statusOf, view, q, tag]);
+
+  // 次に開いたときすぐ出せるよう、受信箱の先頭と件数を端末に保存する（少し待ってから）
+  useEffect(() => {
+    if (loading || !items.length) return;
+    const id = setTimeout(() => {
+      const rows: Preview['rows'] = [];
+      for (const it of items) {
+        if (rows.length >= 120) break;
+        if ((dec[it.id]?.status ?? defaultStatus(it, disabled)) !== 'inbox') continue;
+        rows.push({ id: it.id, t: it.title, c: it.company, ts: it.ts, g: it.judge.tags });
+      }
+      try {
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify({ savedAt: Date.now(), rows, counts: derived.counts }));
+      } catch {
+        /* 保存できなくても動く */
+      }
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [loading, items, dec, disabled, derived.counts]);
 
   const learning = useMemo(() => {
     let manualDrop = 0;
@@ -258,6 +294,8 @@ export function useTriage(repo: Repo) {
     /** ユーザーが振り分けた記事か（AIの初期判定のままなら false） */
     decided: (id: string) => id in dec,
     decisionOf: (id: string) => dec[id],
+    /** 記事の全データを読む（一覧は目次だけなので、詳細を開いたときに使う） */
+    loadArticle: repo.loadArticle ? (it: Item) => repo.loadArticle!(it.id, it.publishedAt) : undefined,
     disabledRules: disabled,
     ruleStats,
     reasonCount,
@@ -281,6 +319,9 @@ export function useTriage(repo: Repo) {
     sel,
     setSel,
     ...derived,
+    // 読み込み中は、前回保存した件数を出す（0件が並ばないように）
+    counts: loading && preview ? preview.counts : derived.counts,
+    preview: loading ? preview : null,
     learning,
     setStatus,
     bulkDrop,

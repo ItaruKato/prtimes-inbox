@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { createMockRepo } from './data/mockRepo';
 import { createFirestoreRepo } from './data/firestoreRepo';
@@ -13,7 +13,7 @@ import { ArticleList } from './components/ArticleList';
 import { DetailPane } from './components/DetailPane';
 import { TabBar } from './components/TabBar';
 import { ToastView } from './components/ToastView';
-import { ReviewPage } from './components/ReviewPage';
+const ReviewPage = lazy(() => import('./components/ReviewPage').then((m) => ({ default: m.ReviewPage })));
 
 // ?stress=1 で 3,000件/日×2日 の負荷テスト用データ
 const stress = new URLSearchParams(location.search).has('stress');
@@ -98,7 +98,9 @@ function Inbox({
       <Sidebar t={t} dataLabel={dataLabel} onSignOut={onSignOut} />
       <section className="main">
         {t.page === 'review' ? (
-          <ReviewPage t={t} />
+          <Suspense fallback={<div className="empty">読み込み中…</div>}>
+            <ReviewPage t={t} />
+          </Suspense>
         ) : (
           <>
             <TopBar t={t} range={range} onRange={onRange} />

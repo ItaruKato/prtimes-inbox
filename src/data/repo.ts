@@ -1,4 +1,4 @@
-import type { AiStatus, Decision, ExclusionConfig, Item, RuleReport } from '../types';
+import type { AiStatus, Article, Decision, ExclusionConfig, Item, RuleReport } from '../types';
 
 export interface Snapshot {
   items: Item[];
@@ -18,6 +18,8 @@ export interface Repo {
   /** 自動除外ルールのオン・オフなどの設定 */
   subscribeConfig(onData: (c: ExclusionConfig) => void): () => void;
   saveConfig(c: ExclusionConfig): Promise<void>;
+  /** 記事の全データ（本文の冒頭・要約など）。一覧が目次だけで動くときに、開いた記事の分だけ読む */
+  loadArticle?(id: string, publishedAt: string): Promise<Article | null>;
   /** 除外ルールの週次集計（新しい週から最大8週） */
   subscribeRuleReports(onData: (r: RuleReport[]) => void): () => void;
 }

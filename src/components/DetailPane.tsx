@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import type { Article, Item } from '../types';
 import type { Triage } from '../state/useTriage';
 import { SCORE_LABEL, VIEWS } from '../lib/tags';
 import { fullDate } from '../lib/format';
@@ -5,8 +7,33 @@ import { TagPills } from './TagPills';
 import { AI_SCORING } from '../lib/flags';
 import { ReasonBox } from './ReasonBox';
 
+/** 一覧は目次（タイトルなど）だけなので、開いた記事の全データを読み足す */
+function useFull(t: Triage, base: Item | undefined): { it: Item | undefined; loading: boolean } {
+  const [full, setFull] = useState<{ id: string; a: Article | null } | null>(null);
+  const load = t.loadArticle;
+  useEffect(() => {
+    if (!base || !load) return;
+    let alive = true;
+    load(base)
+      .then((a) => alive && setFull({ id: base.id, a }))
+      .catch(() => alive && setFull({ id: base.id, a: null }));
+    return () => {
+      alive = false;
+    };
+  }, [base?.id, load]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!base || !load) return { it: base, loading: false };
+  if (!full || full.id !== base.id) return { it: base, loading: true };
+  if (!full.a) return { it: base, loading: false };
+  const a = full.a;
+  return {
+    it: { ...base, lead: a.lead, keywords: a.keywords, section: a.section, ticker: a.ticker || base.ticker, judge: a.ai ?? base.judge },
+    loading: false,
+  };
+}
+
 export function DetailPane({ t }: { t: Triage }) {
-  const it = t.sel ? t.byId.get(t.sel) : undefined;
+  const base = t.sel ? t.byId.get(t.sel) : undefined;
+  const { it, loading } = useFull(t, base);
   if (!it)
     return (
       <aside className="detail" data-open="false">
@@ -77,7 +104,13 @@ export function DetailPane({ t }: { t: Triage }) {
             <div className="summary muted small">要約は、おすすめ度「高」の記事に1時間以内に付きます。</div>
           )
         )}
-        {it.lead ? <div className="lead">{it.lead}</div> : <div className="lead muted">本文の冒頭は未取得です。</div>}
+        {loading ? (
+          <div className="lead muted">本文を読み込み中…</div>
+        ) : it.lead ? (
+          <div className="lead">{it.lead}</div>
+        ) : (
+          <div className="lead muted">本文の冒頭は未取得です。</div>
+        )}
         {it.keywords.length > 0 && (
           <div className="kw">
             {it.keywords.slice(0, 12).map((k) => <span key={k}>{k}</span>)}

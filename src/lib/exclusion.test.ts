@@ -51,3 +51,21 @@ describe('自動除外ルール', () => {
     });
   }
 });
+
+import { mockJudge } from './mockJudge';
+import { isGameArticle } from './mockJudge';
+describe('isGameArticle は mockJudge の新作ゲーム判定と同じ', () => {
+  const titles = [
+    ...Object.values(CASES).flatMap((c) => [...c.drop, ...c.keep]),
+    '新作RPG、事前登録を開始',
+    'シリーズAで資金調達、ゲームアプリ開発を加速',
+    'PS5版の発売日が決定',
+    'Switch 2 が当たるキャンペーン',
+  ];
+  for (const t of titles)
+    for (const kw of [[], ['ゲーム']])
+      it(`${t} / ${kw.join()}`, () => {
+        const a = art(t, { keywords: kw });
+        expect(isGameArticle(a)).toBe(mockJudge(a).autoExclude === '新作ゲーム');
+      });
+});

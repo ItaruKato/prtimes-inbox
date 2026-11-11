@@ -232,3 +232,6 @@ button{font:inherit;color:inherit;cursor:pointer}
 .rulecard .notifybox{border:0;padding:0;background:none}
 .phoneonly{display:none}
 @media (max-width:760px){.phoneonly{display:block}}
+/* 起動直後の「前回の受信箱」 */
+.previewnote{position:sticky;top:0;z-index:3;padding:6px 16px;font-size:12px;color:var(--accent);background:var(--accent-soft);text-align:center}
+.row.preview{opacity:.75}
