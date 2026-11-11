@@ -54,7 +54,7 @@ export const backfillPast = onSchedule(
   },
 );
 
-/** 毎日4時に古いデータを削除（「読む」「既読」に入れた記事は saved に残るので消えない） */
+/** 毎日4時に古いデータを削除（いまは保存期間を無期限にしているので何もしない。cleanup.ts の RETENTION_DAYS で変更） */
 export const cleanupDaily = onSchedule({ ...common, schedule: '0 4 * * *', timeoutSeconds: 300 }, async () => {
   const r = await cleanup(db, new Date());
   logger.info('cleanup done', r);

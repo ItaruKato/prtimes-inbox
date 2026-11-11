@@ -321,7 +321,7 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
       await db.collection('buckets').doc(id).set({ items: {} });
     for (const id of ['20261109', '20261110']) await db.collection('decisions').doc(id).set({ d: {} });
     await db.collection('saved').doc('x').set({ a: 1 });
-    const r = await cleanup(db, now);
+    const r = await cleanup(db, now, 30);
     expect(r.deleted).toBe(3);
     expect((await db.collection('buckets').get()).docs.map((d) => d.id)).toEqual(['2026111012', '2026111012_2', '2026111013']);
     expect((await db.collection('decisions').get()).docs.map((d) => d.id)).toEqual(['20261110']);

@@ -1,7 +1,10 @@
 import type { Firestore } from 'firebase-admin/firestore';
 
-/** 受信箱・候補・不要の記事を残す日数（「読む」「既読」は saved に無期限で残る） */
-export const RETENTION_DAYS = 30;
+/**
+ * 受信箱・不要などの記事を残す日数。null なら削除しない（無期限）。
+ * 画面の「全期間」でさかのぼれるよう、いまは無期限にしている（「読む」「既読」は saved にも残る）。
+ */
+export const RETENTION_DAYS: number | null = null;
 
 const jstKey = (d: Date, len: 8 | 10) => {
   const t = new Date(d.getTime() + 9 * 3600e3);
@@ -9,8 +12,9 @@ const jstKey = (d: Date, len: 8 | 10) => {
   return `${t.getUTCFullYear()}${p(t.getUTCMonth() + 1)}${p(t.getUTCDate())}${p(t.getUTCHours())}`.slice(0, len);
 };
 
-export async function cleanup(db: Firestore, now: Date) {
-  const limit = new Date(now.getTime() - RETENTION_DAYS * 86400e3);
+export async function cleanup(db: Firestore, now: Date, retentionDays: number | null = RETENTION_DAYS) {
+  if (retentionDays === null) return { deleted: 0, before: null, skipped: 'retention-unlimited' };
+  const limit = new Date(now.getTime() - retentionDays * 86400e3);
   let deleted = 0;
   for (const [col, len] of [['buckets', 10], ['decisions', 8]] as const) {
     // ドキュメントの中身は読まない（select()）。何日分もたまっていてもメモリに収まるよう、400件ずつ消す
