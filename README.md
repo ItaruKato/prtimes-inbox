@@ -35,3 +35,15 @@ npm run dev
 - `src/lib/mockJudge.ts` 仮のAI判定（キーワード一致）。本番は取得処理でClaudeが判定
 - `src/state/useTriage.ts` 振り分け状態・件数集計・元に戻す
 - `src/components/` 画面部品
+
+## 運用（自動除外ルール）
+
+| いつ | 何が | どこで見る |
+|---|---|---|
+| 毎晩 2:48 | 自動セッションが「不要にした理由」をもとにルールを見直す（同じ種類が3件以上でルール化。`docs/rule-review.md` の手順） | `docs/rule-review-log.md`、iPhone の通知 |
+| 毎週月曜 7:30 | `rule-report` ワークフローがルールごとの週次集計を `ruleReports` に保存 | アプリの「ルールの点検」画面 |
+| 毎週月曜 7:49 | 自動セッションが週次集計を点検し、注意点を報告（変更はしない） | iPhone の通知 |
+| 必要なとき | `rule-check` ワークフローでルール案を本番の全記事に当てて試す（読み取りのみ） | GitHub Actions のログ |
+
+- ルールの定義とテストは `src/lib/exclusion.ts` と `src/lib/exclusion.test.ts`（デプロイ前に `npm test` で確認）
+- ルールのオン・オフはアプリのルール一覧のチェックで切り替え（`config/exclusion` に保存）
