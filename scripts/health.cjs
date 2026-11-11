@@ -78,6 +78,20 @@ const jst = (ms, len) => {
   log(`新作ゲーム扱い（不要に入る）: ${game}件（Claude ${gameByAi} / キーワード ${gameByRule}）`);
   log(gameSamples.join('\n'));
   log(`buckets(10日): ${snap.size}件のドキュメント / 記事 ${total}件 / 最新の配信 ${latest}`);
+  // 一覧用の目次（days）が記事本体に追いついているか
+  const daysSnap = await db.collection('days').where(FieldPath.documentId(), '>=', since.slice(0, 8)).get();
+  let dayEntries = 0;
+  let dayLatest = '';
+  let dayMax = 0;
+  for (const d of daysSnap.docs) {
+    const items = d.data().items ?? {};
+    dayMax = Math.max(dayMax, Buffer.byteLength(JSON.stringify(items)));
+    for (const e of Object.values(items)) {
+      dayEntries++;
+      if (e.p > dayLatest) dayLatest = e.p;
+    }
+  }
+  log(`目次(days・10日): ${daysSnap.size}件のドキュメント / ${dayEntries}件 / 最新の配信 ${dayLatest} / 最大 約${Math.round(dayMax / 1024)}KB${dayLatest < latest ? '  ← 記事本体より古い（目次の更新を確認）' : ''}`);
   log(`日別: ${JSON.stringify(perDay)}`);
   log(`判定者: ${JSON.stringify(byModel)}`);
   log(`おすすめ度: ${JSON.stringify(byScore)}`);
