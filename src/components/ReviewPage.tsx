@@ -3,6 +3,7 @@ import type { Item, RuleReport } from '../types';
 import type { Triage } from '../state/useTriage';
 import { EXCLUSION_RULES } from '../lib/exclusion';
 import { fullDate, num } from '../lib/format';
+import { NotifyBox } from './NotifyBox';
 
 const SAMPLE = 15;
 const DAY = 86400e3;
@@ -114,6 +115,10 @@ export function ReviewPage({ t }: { t: Triage }) {
         </p>
         <Uncovered title="今週" r={current} />
         <Uncovered title="先週" r={latestComplete} />
+      </article>
+
+      <article className="rulecard">
+        <NotifyBox />
       </article>
     </section>
   );

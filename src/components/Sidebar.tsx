@@ -4,6 +4,7 @@ import { num } from '../lib/format';
 import { USD_JPY } from '../lib/aiCost';
 import { AI_SCORING } from '../lib/flags';
 import { RulesPanel } from './RulesPanel';
+import { NotifyBox } from './NotifyBox';
 
 export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: string; onSignOut?: () => void }) {
   return (
@@ -40,6 +41,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
         </div>
       )}
       <RulesPanel t={t} />
+      <NotifyBox />
 {AI_SCORING && (
       <div className="learn">
         AIに渡す学習データ

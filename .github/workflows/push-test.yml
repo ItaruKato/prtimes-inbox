@@ -1,0 +1,35 @@
+name: push-test
+
+# 毎朝の通知をすぐに1回送る（端末を登録できたかの確認用）。dry_run=true なら送らずに内容だけ表示
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 送らずに内容だけ表示する
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: functions
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/723210521199/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@prtimes-inbox.iam.gserviceaccount.com
+      - name: 通知を送る
+        env:
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: node scripts/push-test.cjs

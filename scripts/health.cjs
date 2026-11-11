@@ -59,7 +59,7 @@ const jst = (ms, len) => {
     }
   }
   // 画面の「不要」（新作ゲーム）判定と同じ条件で数える：Claude の過去の判定 or キーワード
-  const { ruleJudge } = require(path.join(__dirname, '..', 'functions', 'lib', 'judge.js'));
+  const { ruleJudge } = require(path.join(__dirname, '..', 'functions', 'lib', 'functions', 'src', 'judge.js'));
   let gameByAi = 0;
   let gameByRule = 0;
   let game = 0;

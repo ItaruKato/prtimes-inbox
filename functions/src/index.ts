@@ -8,6 +8,8 @@ import { collect } from './collect';
 import { cleanup } from './cleanup';
 import { enrich } from './enrich';
 import { backfill } from './backfill';
+import { getMessaging } from 'firebase-admin/messaging';
+import { morningMessage, morningSummary, sendToAll } from './morning';
 
 initializeApp();
 const db = getFirestore();
@@ -51,6 +53,25 @@ export const backfillPast = onSchedule(
   { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
     await backfill({ db, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/**
+ * 毎朝9時に、前日の新着と直近7日の未処理の件数を、登録された端末（iPhone のホーム画面アプリなど）に通知する。
+ * 通知の送信権限があるデプロイ用アカウントで動かす。
+ */
+export const morningPush = onSchedule(
+  {
+    ...common,
+    schedule: '0 9 * * *',
+    timeoutSeconds: 300,
+    memory: '1GiB',
+    serviceAccount: 'github-deploy@prtimes-inbox.iam.gserviceaccount.com',
+  },
+  async () => {
+    const summary = await morningSummary(db, new Date());
+    const r = await sendToAll(db, getMessaging(), morningMessage(summary));
+    logger.info('morning push', { ...summary, ...r });
   },
 );
 

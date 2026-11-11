@@ -10,7 +10,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // 登録は src/main.tsx の registerSW で行う（更新時に自動で再読み込みする）
       injectRegister: false,
-      workbox: { clientsClaim: true, skipWaiting: true, navigateFallbackDenylist: [/^\/__/] },
+      // 通知を受け取るため、サービスワーカーは自前（src/sw.ts）。保存するファイルの一覧はビルド時に差し込まれる
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: { maximumFileSizeToCacheInBytes: 3 * 1024 * 1024 },
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'PR Times Watcher',

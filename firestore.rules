@@ -39,6 +39,11 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // 毎朝の通知の送り先（端末ごとの登録）
+    match /pushTokens/{id} {
+      allow read, write: if isOwner();
+    }
+
     // 画面の設定（自動除外ルールのオン・オフなど）
     match /config/{doc} {
       allow read, write: if isOwner();

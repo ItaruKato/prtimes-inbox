@@ -29,6 +29,9 @@
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "vite-plugin-pwa": "^1.0.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "workbox-core": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
   }
 }

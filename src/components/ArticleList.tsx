@@ -7,6 +7,7 @@ import { AI_SCORING } from '../lib/flags';
 import { activeRule } from '../state/useTriage';
 import { ruleLabel } from '../lib/exclusion';
 import { RulesPanel } from './RulesPanel';
+import { NotifyBox } from './NotifyBox';
 
 const PAGE = 150;
 
@@ -75,6 +76,11 @@ export function ArticleList({ t }: { t: Triage }) {
   let cur = '';
   return (
     <div className="list" ref={listRef} onScroll={onScroll}>
+      {view === 'inbox' && (
+        <div className="rulesinline phoneonly">
+          <NotifyBox banner />
+        </div>
+      )}
       {view === 'drop' && (
         <div className="rulesinline">
           <RulesPanel t={t} compact />
