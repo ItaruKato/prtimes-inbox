@@ -24,9 +24,9 @@ const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
  */
 const AI_ENABLED = false;
 
-/** 1時間ごとに PR TIMES の新着を取得（毎時5分） */
+/** 30分ごとに PR TIMES の新着を取得（毎時5分・35分）。関数名は以前のまま（変えるとデプロイで消して作り直しになるため） */
 export const collectHourly = onSchedule(
-  { ...common, schedule: '5 * * * *', timeoutSeconds: 540, memory: '512MiB', retryCount: 1 },
+  { ...common, schedule: '5,35 * * * *', timeoutSeconds: 540, memory: '512MiB', retryCount: 1 },
   async () => {
     await collect({ db, log: (msg, data) => logger.info(msg, data) });
   },

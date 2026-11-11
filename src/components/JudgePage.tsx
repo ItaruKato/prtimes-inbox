@@ -149,7 +149,7 @@ export function JudgePage({ t }: { t: Triage }) {
         {!cur && (
           <div className="empty">
             <b>{t.loading ? '読み込み中…' : 'すべて判定しました'}</b>
-            {!t.loading && (skipped.size ? `スキップした ${num(skipped.size)}件は、開き直すと出てきます。` : '新着は1時間ごとに届きます。')}
+            {!t.loading && (skipped.size ? `スキップした ${num(skipped.size)}件は、開き直すと出てきます。` : '新着は30分ごとに届きます。')}
           </div>
         )}
         {next && <Card key={next.id} it={next} full={full[next.id]} behind />}
