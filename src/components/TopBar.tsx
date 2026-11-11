@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { TagFilter, Triage } from '../state/useTriage';
 import { TAGS, VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
+import { RANGES, type RangeKey } from '../lib/range';
 
 const CHIPS: { k: TagFilter; label: string }[] = [{ k: 'all', label: 'すべて' }, ...TAGS, { k: 'other', label: 'タグなし' }];
 
-export function TopBar({ t }: { t: Triage }) {
+export function TopBar({ t, range, onRange }: { t: Triage; range?: RangeKey; onRange?: (k: RangeKey) => void }) {
   const v = VIEWS.find((x) => x.k === t.view)!;
   const [confirm, setConfirm] = useState(false);
   useEffect(() => setConfirm(false), [t.view, t.tag, t.q]);
@@ -29,6 +30,21 @@ export function TopBar({ t }: { t: Triage }) {
           value={t.q}
           onChange={(e) => t.setQ(e.target.value)}
         />
+        {range && onRange && (
+          <select
+            id="range"
+            className="rangesel"
+            aria-label="表示期間"
+            value={range}
+            onChange={(e) => onRange(e.target.value as RangeKey)}
+          >
+            {RANGES.map((r) => (
+              <option key={r.k} value={r.k}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="chips" role="toolbar" aria-label="タグで絞り込み">
         {CHIPS.map((c) => (

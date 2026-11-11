@@ -14,9 +14,7 @@ import type { AiStatus, Article, Decision, Item } from '../types';
 import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
-
-/** 画面に読み込む日数（受信箱・候補・不要）。「読む」「既読」は saved から全期間読む */
-export const LOAD_DAYS = 10;
+import { rangeStart, type RangeKey } from '../lib/range';
 
 /** JST の YYYYMMDD / YYYYMMDDHH */
 export function jstKey(ts: number, len: 8 | 10): string {
@@ -31,14 +29,15 @@ interface SavedDoc {
   decision: Decision;
 }
 
-export function createFirestoreRepo(db: Firestore): Repo {
+/** range: 読み込む期間（受信箱・不要など）。「読む」「既読」は saved から期間に関係なく読む */
+export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo {
   const byId = new Map<string, Item>();
   /** saved にドキュメントがある記事（無い記事に削除を送らないため） */
   const savedIds = new Set<string>();
 
   return {
     subscribe(onData, onError) {
-      const since = Date.now() - LOAD_DAYS * 86400e3;
+      const since = rangeStart(range);
       let buckets = new Map<string, Record<string, Article>>();
       let dayDecisions = new Map<string, Record<string, Decision>>();
       let saved = new Map<string, SavedDoc>();
@@ -62,7 +61,9 @@ export function createFirestoreRepo(db: Firestore): Repo {
       const unsubs = [
         onSnapshot(
           // 開始位置を日単位にそろえ、同じ日のうちは同じクエリにする（開き直しても差分だけ受け取る）
-          query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 8) + '00')),
+          since === null
+            ? collection(db, 'buckets')
+            : query(collection(db, 'buckets'), where(documentId(), '>=', jstKey(since, 8) + '00')),
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
@@ -75,7 +76,9 @@ export function createFirestoreRepo(db: Firestore): Repo {
           fail,
         ),
         onSnapshot(
-          query(collection(db, 'decisions'), where(documentId(), '>=', jstKey(since, 8))),
+          since === null
+            ? collection(db, 'decisions')
+            : query(collection(db, 'decisions'), where(documentId(), '>=', jstKey(since, 8))),
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
