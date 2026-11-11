@@ -191,3 +191,34 @@ button{font:inherit;color:inherit;cursor:pointer}
 .reasontext{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical}
 .reasonacts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .reasonacts .btn:disabled{opacity:.6;cursor:default}
+/* ルールの点検画面 */
+.review{flex:1;overflow-y:auto;padding:16px max(20px,env(safe-area-inset-right,0px)) 40px max(20px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px}
+.reviewhead{display:flex;flex-direction:column;gap:6px}
+.reviewhead h1{margin:0;font-size:20px}
+.reviewhead p{margin:0;max-width:70ch}
+.reviewhead .close{border:0;background:none;color:var(--accent);padding:0;align-self:flex-start;font-size:13px}
+.reviewacts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rulecard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.rulecard h2{margin:0;font-size:15px}
+.rulecard h3{margin:6px 0 0;font-size:13px;color:var(--ink-2)}
+.rulecardhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rulecard .ruledesc{margin:0}
+.warn{margin:0;color:var(--drop);font-size:12px;font-weight:600}
+.tablewrap{overflow-x:auto}
+.weektable{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;min-width:320px}
+.weektable th,.weektable td{border-bottom:1px solid var(--line);padding:5px 10px;text-align:right;white-space:nowrap}
+.weektable th:first-child,.weektable td:first-child{text-align:left}
+.weektable th{color:var(--ink-3);font-weight:500}
+.weektable td.bad{color:var(--drop);font-weight:700}
+.samples{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.samples li{display:flex;gap:10px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0}
+.samplebody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.samplebody a{color:var(--ink);text-decoration:none;font-weight:600;overflow-wrap:anywhere}
+.samplebody a:hover{text-decoration:underline}
+.samples .act{flex:none}
+.uncovered{display:flex;flex-direction:column;gap:6px}
+.rulebox .ghost{align-self:flex-start;margin-top:4px}
+@media (max-width:760px){.samples li{flex-direction:column;align-items:flex-start}}
+.app.reviewing{grid-template-columns:232px minmax(0,1fr)}
+@media (max-width:1180px){.app.reviewing{grid-template-columns:220px minmax(0,1fr)}}
+@media (max-width:760px){.app.reviewing{grid-template-columns:minmax(0,1fr)}}

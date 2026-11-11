@@ -1,4 +1,4 @@
-import type { AiStatus, Decision, ExclusionConfig, Item } from '../types';
+import type { AiStatus, Decision, ExclusionConfig, Item, RuleReport } from '../types';
 
 export interface Snapshot {
   items: Item[];
@@ -18,4 +18,6 @@ export interface Repo {
   /** 自動除外ルールのオン・オフなどの設定 */
   subscribeConfig(onData: (c: ExclusionConfig) => void): () => void;
   saveConfig(c: ExclusionConfig): Promise<void>;
+  /** 除外ルールの週次集計（新しい週から最大8週） */
+  subscribeRuleReports(onData: (r: RuleReport[]) => void): () => void;
 }

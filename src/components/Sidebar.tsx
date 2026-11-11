@@ -15,7 +15,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
       <nav className="navgroup" aria-label="振り分け">
         <div className="navlabel">振り分け</div>
         {VIEWS.map((v) => (
-          <button key={v.k} className="nav" type="button" aria-current={t.view === v.k} onClick={() => t.setView(v.k)}>
+          <button key={v.k} className="nav" type="button" aria-current={t.view === v.k} onClick={() => { t.setPage('triage'); t.setView(v.k); }}>
             <span>
               {v.label}
               {v.note && <small className="navnote">{v.note}</small>}

@@ -60,6 +60,24 @@ export interface Decision {
 export interface ExclusionConfig {
   /** オフにした自動除外ルールの id */
   disabledRules: string[];
+  /** 点検画面で「点検済み」を押した日時（ISO） */
+  lastReviewedAt?: string;
+}
+
+/** 除外ルールの週次集計（ruleReports/{週の月曜}。scripts/rule-report.ts が書く） */
+export interface RuleReport {
+  weekStart: string;
+  weekEnd: string;
+  complete: boolean;
+  generatedAt: string;
+  totalArticles: number;
+  disabledRules: string[];
+  rules: Record<string, { label: string; updated: string; excluded: number; restored: number; restoredTitles: string[] }>;
+  manualDrops: number;
+  withReason: number;
+  uncovered: { title: string; company: string; reasonTags: string[]; reason: string }[];
+  uncoveredCount: number;
+  reasonTagCounts: Record<string, number>;
 }
 
 /** AIの動作状況と費用（画面の左下に表示） */

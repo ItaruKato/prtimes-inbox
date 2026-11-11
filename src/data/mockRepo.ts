@@ -44,6 +44,10 @@ export function createMockRepo(opts: { stress?: boolean } = {}): Repo {
       const t = setTimeout(() => onData({ items, decisions: loadDecisions() }), 0);
       return () => clearTimeout(t);
     },
+    subscribeRuleReports(onData) {
+      const t = setTimeout(() => onData([]), 0);
+      return () => clearTimeout(t);
+    },
     subscribeConfig(onData) {
       let c: ExclusionConfig = { disabledRules: [] };
       try {

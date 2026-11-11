@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AiStatus, Decision, ExclusionConfig, Item, Status, TagKey } from '../types';
+import type { AiStatus, Decision, ExclusionConfig, Item, RuleReport, Status, TagKey } from '../types';
 import { EXCLUSION_RULES } from '../lib/exclusion';
 import type { Repo } from '../data/repo';
 import { AI_SCORING } from '../lib/flags';
@@ -52,6 +52,10 @@ export function useTriage(repo: Repo) {
   const [config, setConfig] = useState<ExclusionConfig>({ disabledRules: [] });
   useEffect(() => repo.subscribeConfig((c) => setConfig(c)), [repo]);
   const disabled = useMemo(() => new Set(config.disabledRules), [config]);
+  const [reports, setReports] = useState<RuleReport[]>([]);
+  useEffect(() => repo.subscribeRuleReports(setReports), [repo]);
+  /** 表示中の画面（振り分け／ルールの点検） */
+  const [page, setPage] = useState<'triage' | 'review'>('triage');
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(
@@ -223,6 +227,13 @@ export function useTriage(repo: Repo) {
     [config, repo, showToast],
   );
 
+  const markReviewed = useCallback(() => {
+    const next = { ...config, lastReviewedAt: new Date().toISOString() };
+    setConfig(next);
+    void repo.saveConfig(next);
+    showToast('点検済みにしました');
+  }, [config, repo, showToast]);
+
   const bulkDrop = useCallback(
     (targets: Item[]) => {
       const at = Date.now();
@@ -252,6 +263,11 @@ export function useTriage(repo: Repo) {
     reasonCount,
     setReason,
     setRuleEnabled,
+    reports,
+    lastReviewedAt: config.lastReviewedAt,
+    markReviewed,
+    page,
+    setPage,
     view,
     setView: (v: Status) => {
       setView(v);

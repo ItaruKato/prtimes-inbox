@@ -13,6 +13,7 @@ import { ArticleList } from './components/ArticleList';
 import { DetailPane } from './components/DetailPane';
 import { TabBar } from './components/TabBar';
 import { ToastView } from './components/ToastView';
+import { ReviewPage } from './components/ReviewPage';
 
 // ?stress=1 で 3,000件/日×2日 の負荷テスト用データ
 const stress = new URLSearchParams(location.search).has('stress');
@@ -93,14 +94,20 @@ function Inbox({
   const dataLabel = t.error ? `読み込みエラー：${t.error}` : t.loading ? '読み込み中…' : source(t.items.length.toLocaleString('ja-JP'));
 
   return (
-    <div className="app">
+    <div className={t.page === 'review' ? 'app reviewing' : 'app'}>
       <Sidebar t={t} dataLabel={dataLabel} onSignOut={onSignOut} />
       <section className="main">
-        <TopBar t={t} range={range} onRange={onRange} />
-        <ArticleList t={t} />
+        {t.page === 'review' ? (
+          <ReviewPage t={t} />
+        ) : (
+          <>
+            <TopBar t={t} range={range} onRange={onRange} />
+            <ArticleList t={t} />
+          </>
+        )}
         <TabBar t={t} />
       </section>
-      <DetailPane t={t} />
+      {t.page === 'triage' && <DetailPane t={t} />}
       <ToastView toast={t.toast} onClose={t.dismissToast} />
     </div>
   );

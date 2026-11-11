@@ -11,7 +11,7 @@ import {
   type Firestore,
   type WriteBatch,
 } from 'firebase/firestore';
-import type { AiStatus, Article, Decision, ExclusionConfig, Item } from '../types';
+import type { AiStatus, Article, Decision, ExclusionConfig, Item, RuleReport } from '../types';
 import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
@@ -137,6 +137,23 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
       };
     },
 
+    subscribeRuleReports(onData) {
+      // 1週に1件しか増えないので、すべて読んで新しい順に並べる
+      return onSnapshot(
+        collection(db, 'ruleReports'),
+        (snap) =>
+          onData(
+            snap.docs
+              .map((d) => d.data() as RuleReport)
+              .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+              .slice(0, 8),
+          ),
+        (e) => {
+          console.error('ruleReports', e);
+          onData([]);
+        },
+      );
+    },
     subscribeConfig(onData) {
       return onSnapshot(
         doc(db, 'config', 'exclusion'),

@@ -27,6 +27,9 @@ export function RulesPanel({ t, compact }: { t: Triage; compact?: boolean }) {
       <p className="muted small">
         不要にした理由 <strong>{num(t.reasonCount)}</strong> 件をもとに、ルールを見直していきます。
       </p>
+      <button className="ghost" type="button" onClick={() => t.setPage('review')}>
+        ルールの点検（週1回）を開く
+      </button>
     </>
   );
   if (!compact)
