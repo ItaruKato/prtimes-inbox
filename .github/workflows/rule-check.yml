@@ -1,0 +1,39 @@
+name: rule-check
+
+# 除外ルール案を本番の全記事に当てて試す（読み取りだけ。データは変えない）
+on:
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: 除外するタイトルの正規表現（JavaScript）
+        required: true
+      except:
+        description: 除外しない例外の正規表現（任意）
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/723210521199/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@prtimes-inbox.iam.gserviceaccount.com
+      - name: ルール案の試し判定
+        env:
+          PATTERN: ${{ inputs.pattern }}
+          EXCEPT: ${{ inputs.except }}
+        run: node scripts/rule-check.cjs

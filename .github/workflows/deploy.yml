@@ -27,8 +27,8 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
-      - name: 画面のビルド
-        run: npm ci && npm run build
+      - name: 画面のテストとビルド
+        run: npm ci && npm test && npm run build
       - name: 取得処理のビルドとテスト
         working-directory: functions
         run: npm ci && npm run build && npm test

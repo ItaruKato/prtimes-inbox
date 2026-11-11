@@ -102,8 +102,8 @@ const jst = (ms, len) => {
   log(`除外ルールの設定: ${JSON.stringify(cfg ?? null)}`);
   log(`手動で不要: ${manualDrops.length}件（理由あり ${withReason.length}件） / 理由の選択肢: ${JSON.stringify(tagCount)}`);
   const recent = withReason.sort((a, b) => b.at - a.at).slice(0, 80);
-  log('不要にした理由（新しい順）:\n' + (recent.map((x) => `- ${x.title}｜${x.company}｜[${(x.reasonTags ?? []).join(',')}] ${x.reason ?? ''}`).join('\n') || '（なし）'));
-  log('ルールで除外された記事を戻した記録:\n' + (restored.map((x) => `- [${x.ruleIds.join(',')}→${x.status}] ${x.title}｜${x.company}`).join('\n') || '（なし）'));
+  log('不要にした理由（新しい順）:\n' + (recent.map((x) => `- at=${x.at}｜${x.title}｜${x.company}｜[${(x.reasonTags ?? []).join(',')}] ${x.reason ?? ''}`).join('\n') || '（なし）'));
+  log('ルールで除外された記事を戻した記録:\n' + (restored.map((x) => `- at=${x.at}｜[${x.ruleIds.join(',')}→${x.status}] ${x.title}｜${x.company}`).join('\n') || '（なし）'));
   const noReason = manualDrops.filter((x) => !(x.reason || (x.reasonTags ?? []).length)).sort((a, b) => b.at - a.at).slice(0, 40);
   log('理由なしで不要にした記事（新しい順・参考）:\n' + (noReason.map((x) => `- ${x.title}｜${x.company}`).join('\n') || '（なし）'));
 

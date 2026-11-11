@@ -22,6 +22,30 @@ export const isGame = (a: Article): boolean =>
   (a.ai?.by?.startsWith('claude') === true && a.ai.autoExclude === '新作ゲーム') ||
   mockJudge(a).autoExclude === '新作ゲーム';
 
+/**
+ * タイトルの正規表現で判定するルールを作る（毎日の見直しで足すルールは基本これを使う）。
+ * except に当てはまる記事は除外しない（資金調達・M&A など、読みたい記事を巻き込まないため）。
+ */
+export function titleRule(r: {
+  id: string;
+  label: string;
+  description: string;
+  updated: string;
+  include: RegExp;
+  except?: RegExp;
+}): ExclusionRule {
+  return {
+    id: r.id,
+    label: r.label,
+    description: r.description,
+    updated: r.updated,
+    test: (a) => r.include.test(a.title) && !(r.except && r.except.test(a.title)),
+  };
+}
+
+/** どのルールにも共通の例外：注目テーマに当たる記事は除外しない */
+export const ALWAYS_KEEP = /資金調達|第三者割当|シリーズ[A-EＡ-Ｅ]|上場|IPO|M&A|Ｍ＆Ａ|買収|子会社化|経営統合|合併|資本業務提携|事業譲渡|TOB|公開買付/;
+
 export const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'game',
