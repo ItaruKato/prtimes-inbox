@@ -1,4 +1,4 @@
-import type { AiStatus, Decision, Item } from '../types';
+import type { AiStatus, Decision, ExclusionConfig, Item } from '../types';
 
 export interface Snapshot {
   items: Item[];
@@ -15,4 +15,7 @@ export interface Repo {
   saveDecisions(changes: Record<string, Decision | null>): Promise<void>;
   /** AIの動作状況と今月の費用（本番のみ） */
   subscribeAiStatus?(onData: (s: AiStatus) => void): () => void;
+  /** 自動除外ルールのオン・オフなどの設定 */
+  subscribeConfig(onData: (c: ExclusionConfig) => void): () => void;
+  saveConfig(c: ExclusionConfig): Promise<void>;
 }

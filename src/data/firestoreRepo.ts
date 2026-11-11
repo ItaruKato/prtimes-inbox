@@ -3,6 +3,7 @@ import {
   deleteField,
   doc,
   documentId,
+  setDoc,
   onSnapshot,
   query,
   where,
@@ -10,7 +11,7 @@ import {
   type Firestore,
   type WriteBatch,
 } from 'firebase/firestore';
-import type { AiStatus, Article, Decision, Item } from '../types';
+import type { AiStatus, Article, Decision, ExclusionConfig, Item } from '../types';
 import { costUsd, type UsageTotals } from '../lib/aiCost';
 import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
@@ -136,6 +137,17 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
       };
     },
 
+    subscribeConfig(onData) {
+      return onSnapshot(
+        doc(db, 'config', 'exclusion'),
+        (d) => onData({ disabledRules: [], ...((d.data() ?? {}) as Partial<ExclusionConfig>) }),
+        () => onData({ disabledRules: [] }),
+      );
+    },
+    async saveConfig(c) {
+      await setDoc(doc(db, 'config', 'exclusion'), c, { merge: true });
+    },
+
     async saveDecisions(changes) {
       // decisions/{記事の配信日} にまとめて書く。「読む」「既読」は記事ごと saved にも残す（無期限）
       const ops: ((b: WriteBatch) => void)[] = [];
@@ -145,7 +157,10 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         if (!it) continue;
         const day = jstKey(it.ts, 8);
         const m = perDay.get(day) ?? {};
-        m[id] = d ?? deleteField();
+        // merge で書くので、消した項目（理由など）は明示的に削除する
+        m[id] = d
+          ? ({ ...d, reason: d.reason ?? deleteField(), reasonTags: d.reasonTags ?? deleteField() } as unknown as Decision)
+          : deleteField();
         perDay.set(day, m);
         const savedRef = doc(db, 'saved', id);
         if (d && (d.status === 'keep' || d.status === 'done')) {

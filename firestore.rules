@@ -33,5 +33,10 @@ service cloud.firestore {
     match /saved/{id} {
       allow read, write: if isOwner();
     }
+
+    // 画面の設定（自動除外ルールのオン・オフなど）
+    match /config/{doc} {
+      allow read, write: if isOwner();
+    }
   }
 }

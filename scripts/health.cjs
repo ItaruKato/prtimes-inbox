@@ -90,6 +90,23 @@ const jst = (ms, len) => {
   const saved = await db.collection('saved').count().get();
   log(`decisions: ${dec.size}日分 / saved: ${saved.data().count}件`);
 
+  // 除外ルールの見直し材料：不要にした理由、ルールで除外された記事を戻した記録
+  const all = [];
+  for (const d of dec.docs) for (const [id, x] of Object.entries(d.data().d ?? {})) all.push({ id, ...x });
+  const manualDrops = all.filter((x) => x.how === 'manual' && x.status === 'drop');
+  const withReason = manualDrops.filter((x) => x.reason || (x.reasonTags ?? []).length);
+  const tagCount = {};
+  for (const x of withReason) for (const t of x.reasonTags ?? []) tagCount[t] = (tagCount[t] ?? 0) + 1;
+  const restored = all.filter((x) => x.how === 'manual' && x.status !== 'drop' && (x.ruleIds ?? []).length);
+  const cfg = (await db.doc('config/exclusion').get()).data();
+  log(`除外ルールの設定: ${JSON.stringify(cfg ?? null)}`);
+  log(`手動で不要: ${manualDrops.length}件（理由あり ${withReason.length}件） / 理由の選択肢: ${JSON.stringify(tagCount)}`);
+  const recent = withReason.sort((a, b) => b.at - a.at).slice(0, 80);
+  log('不要にした理由（新しい順）:\n' + (recent.map((x) => `- ${x.title}｜${x.company}｜[${(x.reasonTags ?? []).join(',')}] ${x.reason ?? ''}`).join('\n') || '（なし）'));
+  log('ルールで除外された記事を戻した記録:\n' + (restored.map((x) => `- [${x.ruleIds.join(',')}→${x.status}] ${x.title}｜${x.company}`).join('\n') || '（なし）'));
+  const noReason = manualDrops.filter((x) => !(x.reason || (x.reasonTags ?? []).length)).sort((a, b) => b.at - a.at).slice(0, 40);
+  log('理由なしで不要にした記事（新しい順・参考）:\n' + (noReason.map((x) => `- ${x.title}｜${x.company}`).join('\n') || '（なし）'));
+
   try {
     const errs = execSync(
       `gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR AND timestamp>="${new Date(now - 6 * 3600e3).toISOString()}"' --project=prtimes-inbox --limit=20 --format='value(timestamp,resource.labels.service_name,textPayload,jsonPayload.message)'`,

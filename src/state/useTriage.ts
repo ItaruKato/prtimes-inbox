@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AiStatus, Decision, Item, Status, TagKey } from '../types';
+import type { AiStatus, Decision, ExclusionConfig, Item, Status, TagKey } from '../types';
+import { EXCLUSION_RULES } from '../lib/exclusion';
 import type { Repo } from '../data/repo';
 import { AI_SCORING } from '../lib/flags';
 
 export type TagFilter = 'all' | 'other' | TagKey;
 
-/** AIの判定から決まる初期の振り分け先 */
-export function defaultStatus(it: Item): Status {
-  if (!AI_SCORING) return it.game ? 'drop' : 'inbox';
-  if (it.game || it.judge.autoExclude) return 'drop';
+/** 当てはまる自動除外ルールのうち、オンになっている最初のもの */
+export function activeRule(it: Item, disabled: ReadonlySet<string>): string | undefined {
+  return it.rules.find((id) => !disabled.has(id));
+}
+
+/** 初期の振り分け先（自動除外ルール・AIの判定から決まる） */
+export function defaultStatus(it: Item, disabled: ReadonlySet<string> = new Set()): Status {
+  const rule = activeRule(it, disabled);
+  if (!AI_SCORING) return rule ? 'drop' : 'inbox';
+  if (rule || it.judge.autoExclude) return 'drop';
   return it.judge.score === 'high' ? 'inbox' : it.judge.score === 'mid' ? 'cand' : 'drop';
 }
 
@@ -16,6 +23,8 @@ export interface Toast {
   id: number;
   text: string;
   undo?: () => void;
+  /** 「理由を書く」など、もう1つの操作 */
+  action?: { label: string; run: () => void };
 }
 
 const LABEL: Record<Status, string> = {
@@ -40,6 +49,9 @@ export function useTriage(repo: Repo) {
   const [error, setError] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   useEffect(() => repo.subscribeAiStatus?.(setAiStatus), [repo]);
+  const [config, setConfig] = useState<ExclusionConfig>({ disabledRules: [] });
+  useEffect(() => repo.subscribeConfig((c) => setConfig(c)), [repo]);
+  const disabled = useMemo(() => new Set(config.disabledRules), [config]);
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(
@@ -57,7 +69,7 @@ export function useTriage(repo: Repo) {
   }, [repo]);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const statusOf = useCallback((it: Item) => dec[it.id]?.status ?? defaultStatus(it), [dec]);
+  const statusOf = useCallback((it: Item) => dec[it.id]?.status ?? defaultStatus(it, disabled), [dec, disabled]);
 
   // 件数集計と表示対象を1回の走査で作る（3,000件/日×数日でも軽く）
   const derived = useMemo(() => {
@@ -91,9 +103,29 @@ export function useTriage(repo: Repo) {
     return { manualDrop, picked };
   }, [dec, byId]);
 
-  const showToast = useCallback((text: string, undo?: () => void) => {
+  /** ルールごとの件数：当てはまる記事、そのうち受信箱などに戻した記事（ルールが外れていた候補） */
+  const ruleStats = useMemo(() => {
+    const m: Record<string, { matched: number; restored: number }> = {};
+    for (const r of EXCLUSION_RULES) m[r.id] = { matched: 0, restored: 0 };
+    for (const it of items)
+      for (const id of it.rules) {
+        const s = m[id];
+        if (!s) continue;
+        s.matched++;
+        const d = dec[it.id];
+        if (d && d.how === 'manual' && d.status !== 'drop') s.restored++;
+      }
+    return m;
+  }, [items, dec]);
+
+  const reasonCount = useMemo(
+    () => Object.values(dec).filter((d) => d.status === 'drop' && d.how === 'manual' && (d.reason || d.reasonTags?.length)).length,
+    [dec],
+  );
+
+  const showToast = useCallback((text: string, undo?: () => void, action?: Toast['action']) => {
     toastSeq.current++;
-    setToast({ id: toastSeq.current, text, undo });
+    setToast({ id: toastSeq.current, text, undo, action });
   }, []);
 
   /** 振り分けを適用し、元に戻す関数を返す */
@@ -130,14 +162,65 @@ export function useTriage(repo: Repo) {
       const it = byId.get(id);
       if (!it) return;
       // AIの初期判定と同じ場所に戻す場合は記録を消す
+      const prev = dec[it.id];
       const change: Decision | null =
-        status === defaultStatus(it)
+        status === defaultStatus(it, disabled)
           ? null
-          : { status, how: 'manual', at: Date.now(), title: it.title, company: it.company, aiScore: it.judge.score };
+          : {
+              status,
+              how: 'manual',
+              at: Date.now(),
+              title: it.title,
+              company: it.company,
+              aiScore: it.judge.score,
+              ...(it.rules.length ? { ruleIds: it.rules } : {}),
+              // 不要のまま操作し直したときは、書いた理由を残す
+              ...(status === 'drop' && prev?.reason ? { reason: prev.reason } : {}),
+              ...(status === 'drop' && prev?.reasonTags?.length ? { reasonTags: prev.reasonTags } : {}),
+            };
       const undo = apply({ [id]: change });
-      showToast(LABEL[status], undo);
+      showToast(
+        LABEL[status],
+        undo,
+        status === 'drop' ? { label: '理由を書く', run: () => setSel(id) } : undefined,
+      );
     },
-    [byId, apply, showToast],
+    [byId, dec, disabled, apply, showToast],
+  );
+
+  /** 不要にした理由を記録する（ルールで自動除外された記事に書いた場合も、手動の「不要」として残す） */
+  const setReason = useCallback(
+    (id: string, reason: string, reasonTags: string[]) => {
+      const it = byId.get(id);
+      if (!it) return;
+      const prev = dec[id];
+      const base: Decision =
+        prev && prev.status === 'drop'
+          ? prev
+          : { status: 'drop', how: 'manual', at: Date.now(), title: it.title, company: it.company, aiScore: it.judge.score, ...(it.rules.length ? { ruleIds: it.rules } : {}) };
+      const next: Decision = { ...base, how: 'manual', title: it.title, company: it.company };
+      const text = reason.trim();
+      if (text) next.reason = text.slice(0, 500);
+      else delete next.reason;
+      if (reasonTags.length) next.reasonTags = reasonTags;
+      else delete next.reasonTags;
+      apply({ [id]: next });
+      showToast('理由を保存しました');
+    },
+    [byId, dec, apply, showToast],
+  );
+
+  const setRuleEnabled = useCallback(
+    (id: string, enabled: boolean) => {
+      const set = new Set(config.disabledRules);
+      if (enabled) set.delete(id);
+      else set.add(id);
+      const next = { ...config, disabledRules: [...set] };
+      setConfig(next);
+      void repo.saveConfig(next);
+      showToast(enabled ? 'ルールをオンにしました' : 'ルールをオフにしました（当てはまる記事は受信箱に入ります）');
+    },
+    [config, repo, showToast],
   );
 
   const bulkDrop = useCallback(
@@ -163,6 +246,12 @@ export function useTriage(repo: Repo) {
     statusOf,
     /** ユーザーが振り分けた記事か（AIの初期判定のままなら false） */
     decided: (id: string) => id in dec,
+    decisionOf: (id: string) => dec[id],
+    disabledRules: disabled,
+    ruleStats,
+    reasonCount,
+    setReason,
+    setRuleEnabled,
     view,
     setView: (v: Status) => {
       setView(v);

@@ -32,8 +32,8 @@ export interface AiJudgement {
 export interface Item extends Article {
   ts: number;
   judge: AiJudgement;
-  /** 新作ゲームの案内か（自動で「不要」に入れる） */
-  game: boolean;
+  /** 当てはまる自動除外ルールの id（src/lib/exclusion.ts）。オンのルールが1つでもあれば「不要」に入る */
+  rules: string[];
 }
 
 export type Status = 'inbox' | 'cand' | 'keep' | 'done' | 'drop';
@@ -48,6 +48,18 @@ export interface Decision {
   title?: string;
   company?: string;
   aiScore?: Score;
+  /** 不要にした理由（自由記入）。除外ルールを見直す材料にする */
+  reason?: string;
+  /** 不要にした理由（選択肢。src/lib/exclusion.ts の REASON_PRESETS） */
+  reasonTags?: string[];
+  /** 自動除外ルールに当てはまっていた記事か（受信箱に戻したら、そのルールの見直し材料） */
+  ruleIds?: string[];
+}
+
+/** 画面の設定（Firestore の config/exclusion。端末をまたいで共有） */
+export interface ExclusionConfig {
+  /** オフにした自動除外ルールの id */
+  disabledRules: string[];
 }
 
 /** AIの動作状況と費用（画面の左下に表示） */

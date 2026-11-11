@@ -4,6 +4,9 @@ import type { Triage } from '../state/useTriage';
 import { dayKey, num } from '../lib/format';
 import { ArticleRow } from './ArticleRow';
 import { AI_SCORING } from '../lib/flags';
+import { activeRule } from '../state/useTriage';
+import { ruleLabel } from '../lib/exclusion';
+import { RulesPanel } from './RulesPanel';
 
 const PAGE = 150;
 
@@ -58,6 +61,11 @@ export function ArticleList({ t }: { t: Triage }) {
     const [a, b] = EMPTY[view];
     return (
       <div className="list">
+        {view === 'drop' && (
+          <div className="rulesinline">
+            <RulesPanel t={t} compact />
+          </div>
+        )}
         <div className="empty"><b>{a}</b>{b}</div>
       </div>
     );
@@ -67,6 +75,11 @@ export function ArticleList({ t }: { t: Triage }) {
   let cur = '';
   return (
     <div className="list" ref={listRef} onScroll={onScroll}>
+      {view === 'drop' && (
+        <div className="rulesinline">
+          <RulesPanel t={t} compact />
+        </div>
+      )}
       {visible.slice(0, shown).map((it) => {
         const k = dayKey(it.ts);
         const head = k !== cur;
@@ -74,8 +87,8 @@ export function ArticleList({ t }: { t: Triage }) {
         const st = t.statusOf(it);
         const note =
           st === 'drop' && !t.decided(it.id)
-            ? it.game
-              ? '自動除外：新作ゲーム'
+            ? activeRule(it, t.disabledRules)
+              ? `自動除外：${ruleLabel(activeRule(it, t.disabledRules)!)}`
               : AI_SCORING && it.judge.autoExclude
                 ? `自動除外：${it.judge.autoExclude}`
                 : AI_SCORING && it.judge.score === 'low'

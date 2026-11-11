@@ -9,7 +9,7 @@ export function TagPills({ it }: { it: Item }) {
           {tagLabel(k)}
         </span>
       ))}
-      {it.game && <span className="tag game">ゲーム</span>}
+      {it.rules.includes('game') && <span className="tag game">ゲーム</span>}
     </>
   );
 }

@@ -11,6 +11,11 @@ export function ToastView({ toast, onClose }: { toast: Toast | null; onClose: ()
   return (
     <div className="toast" role="status">
       <span>{toast.text}</span>
+      {toast.action && (
+        <button type="button" onClick={() => { toast.action!.run(); onClose(); }}>
+          {toast.action.label}
+        </button>
+      )}
       {toast.undo && (
         <button type="button" onClick={() => { toast.undo!(); onClose(); }}>
           元に戻す

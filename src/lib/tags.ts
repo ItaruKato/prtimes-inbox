@@ -19,7 +19,7 @@ export const VIEWS: { k: Status; label: string; note?: string }[] = AI_SCORING
       { k: 'drop', label: '不要' },
     ]
   : [
-      { k: 'inbox', label: '受信箱', note: '新作ゲーム以外すべて' },
+      { k: 'inbox', label: '受信箱', note: '自動除外以外すべて' },
       { k: 'keep', label: '読む' },
       { k: 'done', label: '既読' },
       { k: 'drop', label: '不要' },

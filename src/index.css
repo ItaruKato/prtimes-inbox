@@ -175,3 +175,19 @@ button{font:inherit;color:inherit;cursor:pointer}
 .aibox .err{color:var(--drop)}
 .rangesel{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:7px 8px;font:inherit;font-size:13px;flex:none}
 @media (max-width:760px){.rangesel{order:4;width:118px}}
+/* 自動除外ルール・不要の理由 */
+.rules{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ruleline{display:flex;align-items:center;gap:6px;cursor:pointer}
+.ruleline .n{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--ink-3)}
+.ruledesc{margin:2px 0 0 22px;font-size:11px;color:var(--ink-3);line-height:1.5}
+.rulesinline{padding:10px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.rulebox.compact{background:var(--surface)}
+.rulebox.compact summary{cursor:pointer;display:flex;gap:6px;align-items:center}
+.rulebox.compact[open] summary{margin-bottom:8px}
+.reasonbox{border:1px solid var(--drop-soft);background:color-mix(in srgb,var(--surface) 92%,var(--drop));border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.reasonbox b{font-size:12px;letter-spacing:.04em}
+.reasonbox p{margin:0}
+.reasonchips{display:flex;flex-wrap:wrap;gap:6px}
+.reasontext{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical}
+.reasonacts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.reasonacts .btn:disabled{opacity:.6;cursor:default}

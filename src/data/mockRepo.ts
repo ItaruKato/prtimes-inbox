@@ -1,9 +1,10 @@
-import type { Article, Decision, Item } from '../types';
+import type { Article, Decision, ExclusionConfig, Item } from '../types';
 import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
 import sample from './sample.json';
 
 const LS_KEY = 'prt-decisions-v1';
+const LS_CONFIG = 'prt-exclusion-config-v1';
 
 
 
@@ -42,6 +43,23 @@ export function createMockRepo(opts: { stress?: boolean } = {}): Repo {
       const items = (opts.stress ? stress(base) : base).sort((a, b) => b.ts - a.ts);
       const t = setTimeout(() => onData({ items, decisions: loadDecisions() }), 0);
       return () => clearTimeout(t);
+    },
+    subscribeConfig(onData) {
+      let c: ExclusionConfig = { disabledRules: [] };
+      try {
+        c = { ...c, ...JSON.parse(localStorage.getItem(LS_CONFIG) || '{}') };
+      } catch {
+        /* 既定値 */
+      }
+      const t = setTimeout(() => onData(c), 0);
+      return () => clearTimeout(t);
+    },
+    async saveConfig(c) {
+      try {
+        localStorage.setItem(LS_CONFIG, JSON.stringify(c));
+      } catch {
+        /* 保存できない環境では画面上だけ反映 */
+      }
     },
     async saveDecisions(changes) {
       try {

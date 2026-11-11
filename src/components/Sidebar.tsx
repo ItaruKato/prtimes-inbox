@@ -3,6 +3,7 @@ import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
 import { USD_JPY } from '../lib/aiCost';
 import { AI_SCORING } from '../lib/flags';
+import { RulesPanel } from './RulesPanel';
 
 export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: string; onSignOut?: () => void }) {
   return (
@@ -38,11 +39,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
           <div>今月の費用 約{num(Math.round(t.aiStatus.monthUsd * USD_JPY))}円（${t.aiStatus.monthUsd.toFixed(2)}）</div>
         </div>
       )}
-      <div className="rulebox">
-        <b>自動除外ルール</b>
-        <div>・新作ゲームの案内</div>
-        <div className="muted">定時株主総会などは後から追加予定</div>
-      </div>
+      <RulesPanel t={t} />
 {AI_SCORING && (
       <div className="learn">
         AIに渡す学習データ

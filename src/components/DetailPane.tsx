@@ -3,6 +3,7 @@ import { SCORE_LABEL, VIEWS } from '../lib/tags';
 import { fullDate } from '../lib/format';
 import { TagPills } from './TagPills';
 import { AI_SCORING } from '../lib/flags';
+import { ReasonBox } from './ReasonBox';
 
 export function DetailPane({ t }: { t: Triage }) {
   const it = t.sel ? t.byId.get(t.sel) : undefined;
@@ -47,6 +48,7 @@ export function DetailPane({ t }: { t: Triage }) {
             </button>
           )}
         </div>
+        {st === 'drop' && <ReasonBox t={t} it={it} />}
         {AI_SCORING && (
           <div className="summary">
             <b>おすすめ度：{SCORE_LABEL[it.judge.score]}</b>
