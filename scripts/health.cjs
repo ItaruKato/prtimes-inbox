@@ -118,6 +118,14 @@ const jst = (ms, len) => {
   const recent = withReason.sort((a, b) => b.at - a.at).slice(0, 80);
   log('不要にした理由（新しい順）:\n' + (recent.map((x) => `- at=${x.at}｜${x.title}｜${x.company}｜[${(x.reasonTags ?? []).join(',')}] ${x.reason ?? ''}`).join('\n') || '（なし）'));
   log('ルールで除外された記事を戻した記録:\n' + (restored.map((x) => `- at=${x.at}｜[${x.ruleIds.join(',')}→${x.status}] ${x.title}｜${x.company}`).join('\n') || '（なし）'));
+  // 直近の手動判定（判定画面・一覧のどちらも。読む／既読／不要）
+  const manual = all.filter((x) => x.how === 'manual').sort((a, b) => b.at - a.at);
+  const since24 = now - 86400e3;
+  const last24 = manual.filter((x) => x.at >= since24);
+  const cnt = {};
+  for (const x of last24) cnt[x.status] = (cnt[x.status] ?? 0) + 1;
+  log(`直近24時間の手動判定: ${last24.length}件 ${JSON.stringify(cnt)}`);
+  log('直近の手動判定（新しい順）:\n' + (manual.slice(0, 80).map((x) => `- ${new Date(x.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}｜${x.status}｜${x.title}｜${x.company}${(x.reasonTags ?? []).length ? `｜[${x.reasonTags.join(',')}]` : ''}${x.reason ? ` ${x.reason}` : ''}`).join('\n') || '（なし）'));
   const noReason = manualDrops.filter((x) => !(x.reason || (x.reasonTags ?? []).length)).sort((a, b) => b.at - a.at).slice(0, 40);
   log('理由なしで不要にした記事（新しい順・参考）:\n' + (noReason.map((x) => `- ${x.title}｜${x.company}`).join('\n') || '（なし）'));
 
