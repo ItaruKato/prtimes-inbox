@@ -15,6 +15,7 @@
   },
   "include": [
     "src",
-    "../src/lib/exclusion.ts"
+    "../src/lib/exclusion.ts",
+    "../src/lib/dayIndex.ts"
   ]
 }

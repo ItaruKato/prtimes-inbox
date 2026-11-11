@@ -3,6 +3,7 @@ import { FieldPath, FieldValue, type Firestore, type WriteBatch } from 'firebase
 import { judgeArticles, summarizeArticle, type Example, type Usage } from './ai';
 import { extractBody } from './parse';
 import { commitOps, httpGet } from './collect';
+import { indexOps } from './dayIndex';
 import { ruleJudge } from './judge';
 import { withLease } from './lease';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BucketPlanner, hourOf, itemCost, valueSize } from './buckets';
@@ -302,6 +303,8 @@ async function run(deps: EnrichDeps) {
       });
     if (unit.length) units.push(unit);
   }
+  // 目次（days）のタグ・新作ゲーム・要約ありの印も合わせて更新する
+  units.push(...indexOps(db, [...updates.keys()].map((id) => planner.get(id)).filter((a): a is Article => Boolean(a))));
   await commitOps(db, units);
 
   // 4) 利用量の記録（画面に表示して費用を見えるようにする）

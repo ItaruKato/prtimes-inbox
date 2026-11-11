@@ -5,6 +5,11 @@
       "collectionGroup": "buckets",
       "fieldPath": "items",
       "indexes": []
+    },
+    {
+      "collectionGroup": "days",
+      "fieldPath": "items",
+      "indexes": []
     }
   ]
 }

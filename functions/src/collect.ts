@@ -2,6 +2,7 @@ import type { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { BUCKET_MAX_BYTES, BucketPlanner, KEYWORDS_MAX, LEAD_MAX, loadBuckets, valueSize } from './buckets';
 import { bucketKey, companyIdOf, mergeRaw, parseArticlePage, parseNewsSitemap, parseRss, type RawItem } from './parse';
 import { ruleJudge } from './judge';
+import { indexOps } from './dayIndex';
 import type { Article } from './types';
 
 const UA = 'prtimes-inbox/1.0 (personal reader; hourly)';
@@ -140,6 +141,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
   let updated = 0;
   let missingCompany = 0;
   const writes = new Map<string, Record<string, Partial<Article>>>(); // ドキュメントID → 書き込む記事
+  const indexed: Article[] = []; // 目次（days）に載せる記事
   for (const r of todo) {
     const cid = companyIdOf(r.id);
     const prev = planner.get(r.id);
@@ -176,6 +178,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
     const w = writes.get(docId) ?? {};
     w[r.id] = write;
     writes.set(docId, w);
+    indexed.push(prev?.ai ? { ...article, ai: prev.ai } : article);
   }
 
   // 書き込み（ドキュメントごとに items をマージ）
@@ -190,6 +193,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
       },
     ]);
   }
+  units.push(...indexOps(db, indexed));
   for (const [cid, name] of newCompanies)
     if (!companyCache.has(cid))
       units.push([{ bytes: 200, apply: (b) => b.set(db.collection('companies').doc(cid), { name, updatedAt: fetchedAt }) }]);

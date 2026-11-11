@@ -14,6 +14,11 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // 一覧用の目次（取得処理が書く）
+    match /days/{key} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
     match /meta/{doc} {
       allow read: if isOwner();
       allow write: if false;
