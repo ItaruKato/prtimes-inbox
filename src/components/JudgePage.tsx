@@ -9,7 +9,10 @@ import { NotifyBox } from './NotifyBox';
 import { RANGES, type RangeKey } from '../lib/range';
 
 const LS_ORDER = 'prt-judge-order';
-const SWIPE = 90; // これ以上ずらしたら判定する（px）
+const SWIPE = 70; // これ以上ずらしたら判定する（px）
+/** 素早くはじいたときは、短い距離でも判定する（距離 px・速さ px/ミリ秒） */
+const FLICK_MIN = 30;
+const FLICK_SPEED = 0.35;
 
 type Dir = 'keep' | 'drop';
 
@@ -205,7 +208,7 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
         </button>
       </div>
       <p className="judgehint muted small">
-        右にスワイプで「読む」、左にスワイプで「不要」。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
+        右にスワイプで「読む」、左にスワイプで「不要」（軽くはじくだけでも判定します）。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
       </p>
     </section>
   );
@@ -225,14 +228,14 @@ function Card({
   onSwipe?: (d: Dir) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ x: number; y: number; dx: number; id: number; lock: 'x' | 'y' | null } | null>(null);
+  const drag = useRef<{ x: number; y: number; dx: number; id: number; lock: 'x' | 'y' | null; t: number; v: number } | null>(null);
   const [dx, setDx] = useState(0);
 
   // 指（iPhone）はタッチイベント、マウス（PC）はポインターイベントで動かす
   // （タッチでポインターイベントを使うと、ブラウザがスクロールと判断して途中で取り消すことがある）
   const start = (x: number, y: number, id: number, target: EventTarget | null) => {
     if (behind || (target as HTMLElement | null)?.closest('a, button')) return false;
-    drag.current = { x, y, dx: 0, id, lock: null };
+    drag.current = { x, y, dx: 0, id, lock: null, t: performance.now(), v: 0 };
     return true;
   };
   const move = (x: number, y: number) => {
@@ -240,8 +243,13 @@ function Card({
     if (!d) return false;
     const mx = x - d.x;
     const my = y - d.y;
-    if (d.lock === null && (Math.abs(mx) > 8 || Math.abs(my) > 8)) d.lock = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+    if (d.lock === null && (Math.abs(mx) > 6 || Math.abs(my) > 6)) d.lock = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
     if (d.lock !== 'x') return false;
+    // 直近の動きの速さ（はじいたかどうかの判定に使う）
+    const now = performance.now();
+    const dt = Math.max(1, now - d.t);
+    d.v = 0.6 * ((mx - d.dx) / dt) + 0.4 * d.v;
+    d.t = now;
     d.dx = mx;
     setDx(mx);
     return true;
@@ -250,7 +258,8 @@ function Card({
     const d = drag.current;
     drag.current = null;
     if (!d || d.lock !== 'x') return;
-    if (Math.abs(d.dx) >= SWIPE) onSwipe?.(d.dx > 0 ? 'keep' : 'drop');
+    const flick = Math.abs(d.dx) >= FLICK_MIN && Math.abs(d.v) >= FLICK_SPEED && Math.sign(d.v) === Math.sign(d.dx);
+    if (Math.abs(d.dx) >= SWIPE || flick) onSwipe?.(d.dx > 0 ? 'keep' : 'drop');
     else setDx(0);
   };
   const cancel = () => {
