@@ -10,6 +10,10 @@ import { enrich } from './enrich';
 import { backfill } from './backfill';
 import { getMessaging } from 'firebase-admin/messaging';
 import { morningMessage, morningSummary, sendToAll } from './morning';
+import { onCall, HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
+import { SpeechClient } from '@google-cloud/speech';
+import { archivePast, profileSweep } from './company';
+import { draftSweep, makeDraft, syncHandoff, tidyTranscript } from './notes';
 
 initializeApp();
 const db = getFirestore();
@@ -80,3 +84,94 @@ export const cleanupDaily = onSchedule({ ...common, schedule: '0 4 * * *', timeo
   const r = await cleanup(db, new Date());
   logger.info('cleanup done', r);
 });
+
+// ---- 会社の台帳（Long List・Knowledge Base の土台） ----
+
+/** 企業情報（所在地・代表者・電話番号など）を、まだ読んでいない会社から少しずつ読む（10分ごと） */
+export const companyProfiles = onSchedule(
+  { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    await profileSweep({ db, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/** 過去1年分の記事を1日ずつさかのぼり、会社ごとの記事一覧を作る（10分ごと。終わったら何もしない） */
+export const archiveCompanies = onSchedule(
+  { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    await archivePast({ db, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+// ---- 「読む」の後：AIのメモ下書き・音声メモ・Knowledge Base への受け渡し ----
+
+const OWNER_EMAIL = 'i-kato@spark-partners.jp';
+function requireOwner(req: CallableRequest<unknown>) {
+  const t = req.auth?.token;
+  if (!t || t.email !== OWNER_EMAIL || t.email_verified !== true) throw new HttpsError('permission-denied', 'この操作はできません');
+}
+const claude = () => new Anthropic({ apiKey: anthropicKey.value(), maxRetries: 2, timeout: 150_000 });
+
+/** 画面から：「読む」にした記事の下書きを作る */
+export const requestDraft = onCall(
+  { region: 'asia-northeast1', timeoutSeconds: 180, memory: '512MiB', secrets: [anthropicKey] },
+  async (req: CallableRequest<{ id?: string; redo?: boolean }>) => {
+    requireOwner(req);
+    const id = String(req.data?.id ?? '');
+    if (!/^\d+\.\d+$/.test(id)) throw new HttpsError('invalid-argument', '記事IDが正しくありません');
+    if (req.data?.redo) await db.collection('drafts').doc(id).delete();
+    const made = await makeDraft(db, claude(), id, { log: (msg, data) => logger.warn(msg, data) });
+    return { made };
+  },
+);
+
+/** 予備：下書きのない「読む」「読了」の記事を探して作る（10分ごと） */
+export const draftNotes = onSchedule(
+  { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB', secrets: [anthropicKey] },
+  async () => {
+    await draftSweep(db, claude(), { log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/** 画面から：読了・メモの保存のあとに、Knowledge Base への受け渡しを書き直す */
+export const refreshHandoff = onCall(
+  { region: 'asia-northeast1', timeoutSeconds: 60 },
+  async (req: CallableRequest<{ id?: string }>) => {
+    requireOwner(req);
+    const id = String(req.data?.id ?? '');
+    if (!/^\d+\.\d+$/.test(id)) throw new HttpsError('invalid-argument', '記事IDが正しくありません');
+    await syncHandoff(db, id);
+    return { ok: true };
+  },
+);
+
+/**
+ * 画面から：話した音声（16kHz・モノラルの WAV、最大約55秒）を文字に起こし、メモとして整える。
+ * 音声の書き起こし（Google Cloud Speech-to-Text）の権限があるデプロイ用アカウントで動かす。音声は保存しない。
+ */
+export const transcribeMemo = onCall(
+  {
+    region: 'asia-northeast1',
+    timeoutSeconds: 120,
+    memory: '512MiB',
+    secrets: [anthropicKey],
+    serviceAccount: 'github-deploy@prtimes-inbox.iam.gserviceaccount.com',
+  },
+  async (req: CallableRequest<{ audio?: string; title?: string; company?: string }>) => {
+    requireOwner(req);
+    const audio = String(req.data?.audio ?? '');
+    if (!audio || audio.length > 4_000_000) throw new HttpsError('invalid-argument', '音声がないか、長すぎます（1分まで）');
+    const speech = new SpeechClient();
+    const [res] = await speech.recognize({
+      config: { encoding: 'LINEAR16', sampleRateHertz: 16000, languageCode: 'ja-JP', enableAutomaticPunctuation: true, model: 'latest_long' },
+      audio: { content: audio },
+    });
+    const transcript = (res.results ?? [])
+      .map((r) => r.alternatives?.[0]?.transcript ?? '')
+      .join('')
+      .trim();
+    if (!transcript) return { transcript: '', text: '' };
+    const text = await tidyTranscript(claude(), db, transcript, { title: req.data?.title, company: req.data?.company });
+    return { transcript, text };
+  },
+);

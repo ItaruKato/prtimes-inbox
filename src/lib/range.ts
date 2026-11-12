@@ -1,4 +1,4 @@
-/** 画面に読み込む期間（「読む」「既読」に入れた記事は期間に関係なくすべて表示する） */
+/** 画面に読み込む期間（「読む」「読了」に入れた記事は期間に関係なくすべて表示する） */
 export type RangeKey = '3' | '7' | '10' | 'all';
 
 export const RANGES: { k: RangeKey; label: string }[] = [

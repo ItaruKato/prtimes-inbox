@@ -266,3 +266,23 @@ button{font:inherit;color:inherit;cursor:pointer}
 .judgeicon{font-family:var(--f-ui)}
 @media (max-width:760px){.judgehint{display:none}.cardtitle{font-size:18px}.jbtn{padding:13px 8px}}
 @media (max-width:760px){.judgereasons{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none;padding-bottom:2px}.judgereasons::-webkit-scrollbar{display:none}.judgereasons .chip{flex:none}}
+
+/* 営業メモ（「読む」「読了」の記事） */
+.notepanel{border:1px solid var(--keep);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--surface) 94%,var(--keep))}
+.nphead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nphead b{font-size:12px;letter-spacing:.04em}
+.stars{display:inline-flex;gap:2px}
+.stars button{border:0;background:none;font-size:20px;line-height:1;padding:2px 3px;color:var(--ink-3);cursor:pointer}
+.stars button[aria-pressed="true"]{color:#f5a623}
+.memobox{display:flex;flex-direction:column;gap:6px}
+.memobox textarea{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:9px 10px;font:inherit;font-size:14px;line-height:1.6;resize:vertical;min-height:7.5em}
+.memoacts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.memoacts .btn:disabled{opacity:.5;cursor:default}
+.btn.rec.on{background:var(--drop);border-color:var(--drop);color:var(--surface)}
+.err{color:var(--drop)}
+.mytags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.mytags input{flex:1 1 12em;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px}
+.subhead{margin-top:6px}
+.angles,.fits{margin:2px 0 0;padding-left:1.2em;display:grid;gap:4px;color:var(--ink);font-size:13px}
+.fits .pill{display:inline-block;border:1px solid var(--accent-soft);border-radius:999px;padding:0 8px;font-size:11px;color:var(--accent);margin-right:4px}
+.linkbtn{border:0;background:none;color:var(--ink-3);text-decoration:underline;padding:0;align-self:flex-start;cursor:pointer}

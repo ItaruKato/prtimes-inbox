@@ -12,6 +12,7 @@ import { store } from '../src/collect';
 import { enrich } from '../src/enrich';
 import { backfill, BACKFILL_FROM } from '../src/backfill';
 import { cleanup } from '../src/cleanup';
+import { archivePast, ARCHIVE_FROM, profileSweep } from '../src/company';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BUCKET_TARGET_BYTES, docSize, indexEntries, LEAD_MAX } from '../src/buckets';
 import type { RawItem } from '../src/parse';
 import type { Article } from '../src/types';
@@ -314,6 +315,80 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     // 終わった後は何もしない
     expect(await backfill({ db, get: noFetch })).toMatchObject({ done: true, pages: 0 });
   }, 120_000);
+
+  it('会社の台帳：1日ずつさかのぼって会社ごとの記事一覧を作り、新しい会社の企業情報を読む', async () => {
+    const page = (items: { id: string; t: string }[], next: string | null) =>
+      items
+        .map(
+          (x) =>
+            `<article class="list-article"><a href="/main/html/rd/p/${x.id}.html"><h3 class="t">記事${x.id}</h3></a>` +
+            `<time datetime="${x.t}"></time><a class="list-article__company-name-link" href="#">会社${x.id.split('.')[1]}</a></article>`,
+        )
+        .join('') + (next ? `<a href="/main/html/newarrival?pagination_cursor=${next}" class="list-article__more-link">もっと見る</a>` : '');
+    const end2 = Math.floor(new Date('2025-11-03T00:00:00+09:00').getTime() / 1000);
+    const end1 = Math.floor(new Date('2025-11-02T00:00:00+09:00').getTime() / 1000);
+    const pages: Record<string, string> = {
+      [`${end2}_9999999`]: page(
+        [
+          { id: '000000010.000000007', t: '2025-11-02T20:00:00+0900' },
+          { id: '000000011.000000008', t: '2025-11-02T10:00:00+0900' },
+        ],
+        '500_1',
+      ),
+      '500_1': page(
+        [
+          { id: '000000012.000000007', t: '2025-11-02T01:00:00+0900' },
+          { id: '000000013.000000009', t: '2025-11-01T23:00:00+0900' },
+        ],
+        '500_2',
+      ),
+      [`${end1}_9999999`]: page(
+        [
+          { id: '000000013.000000009', t: '2025-11-01T23:00:00+0900' },
+          { id: '000000014.000000009', t: '2025-10-31T22:00:00+0900' },
+        ],
+        '500_3',
+      ),
+    };
+    const get = async (url: string) => {
+      const c = url.match(/pagination_cursor=([0-9_]+)/)?.[1] ?? '';
+      if (!(c in pages)) throw new Error(`unexpected ${url}`);
+      return pages[c];
+    };
+    await db.doc('meta/archive').set({ from: ARCHIVE_FROM, day: '2025-11-02' });
+    await db.doc('companies/8').set({ name: '会社000000008', profile: { phone: '03' } });
+    const r = await archivePast({ db, get, sleep: async () => {} });
+    expect(r).toMatchObject({ done: true, pages: 3, items: 4 });
+    const a7 = (await db.doc('companyArticles/7').get()).data()!;
+    expect(Object.keys(a7.a).sort()).toEqual(['000000010.000000007', '000000012.000000007']);
+    expect(a7.name).toBe('会社000000007');
+    const a9 = (await db.doc('companyArticles/9').get()).data()!;
+    expect(Object.keys(a9.a)).toEqual(['000000013.000000009']); // 10/31 の記事は範囲外
+    // 台帳にない会社だけ企業情報の読み込み待ちに並ぶ
+    expect((await db.collection('profileQueue').get()).docs.map((d) => d.id).sort()).toEqual(['7', '9']);
+    expect((await db.doc('companies/8').get()).data()!.profile).toEqual({ phone: '03' });
+    expect(await archivePast({ db, get: noFetch })).toMatchObject({ done: true, pages: 0 });
+
+    const info = '<dl><dt>業種</dt><dd>情報通信</dd><dt>本社所在地</dt><dd>東京都</dd><dt>電話番号</dt><dd>03-0000-0000</dd></dl>';
+    const p = await profileSweep({ db, get: async () => info, sleep: async () => {} });
+    expect(p).toMatchObject({ done: 2, left: 0 });
+    expect((await db.doc('companies/7').get()).data()).toMatchObject({ name: '会社000000007', profile: { industry: '情報通信', phone: '03-0000-0000' } });
+  }, 120_000);
+
+  it('取得：新しい会社の記事ページから企業情報も入れ、会社ごとの記事一覧に足す', async () => {
+    const raw: RawItem = {
+      id: '000000001.000000042',
+      url: 'https://prtimes.jp/main/html/rd/p/000000001.000000042.html',
+      title: 'テスト',
+      publishedAt: '2026-11-10T10:00:00+09:00',
+    };
+    const html =
+      '<script type="application/ld+json">{"@type":"NewsArticle","author":{"name":"株式会社テスト"},"articleSection":"経営情報"}</script><dl><dt>代表者名</dt><dd>山田太郎</dd><dt>電話番号</dt><dd>03-1111-2222</dd></dl>';
+    await store({ db, get: async () => html, sleep: async () => {} }, [raw], 'collector');
+    const c = (await db.doc('companies/42').get()).data();
+    expect(c?.profile).toEqual({ representative: '山田太郎', phone: '03-1111-2222' });
+    expect((await db.doc('profileQueue/42').get()).exists).toBe(false);
+  }, 60_000);
 
   it('cleanup は30日より前の時間バケット（続きのドキュメントも）と振り分けだけを消す', async () => {
     const now = new Date('2026-12-10T03:00:00Z'); // JST 12/10 12時 → 11/10 12時より前を消す

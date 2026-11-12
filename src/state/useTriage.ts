@@ -46,7 +46,7 @@ export interface Toast {
 const LABEL: Record<Status, string> = {
   keep: '「読む」に入れました',
   drop: '不要にしました',
-  done: '既読にしました',
+  done: '読了にしました（Knowledge Base に渡します）',
   inbox: '受信箱に戻しました',
   cand: '候補に戻しました',
 };

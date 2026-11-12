@@ -24,10 +24,20 @@ const jst = (ms, len) => {
   };
   const now = Date.now();
 
-  for (const id of ['collector', 'backfill', 'backfillStore', 'ai']) {
+  for (const id of ['collector', 'backfill', 'backfillStore', 'ai', 'archive', 'profiles']) {
     const d = (await db.doc(`meta/${id}`).get()).data();
     log(`meta/${id}: ${JSON.stringify(d ?? null)}`);
   }
+  // 会社の台帳と、「読む」の後（AIの下書き・メモ・Knowledge Base への受け渡し）
+  const count = async (c) => (await db.collection(c).count().get()).data().count;
+  log(
+    `台帳: companies ${await count('companies')}社 / companyArticles ${await count('companyArticles')}社 / 企業情報の読み込み待ち ${await count('profileQueue')}社`,
+  );
+  const draftDocs = await db.collection('drafts').get();
+  const dstate = {};
+  for (const d of draftDocs.docs) dstate[d.get('state')] = (dstate[d.get('state')] ?? 0) + 1;
+  log(`AIの下書き: ${JSON.stringify(dstate)} / メモ ${await count('notes')}件 / 受け渡し ${await count('handoff')}件`);
+  for (const d of draftDocs.docs.filter((x) => x.get('state') === 'failed').slice(0, 5)) log(`  下書きの失敗: ${d.id} ${d.get('error')}`);
 
   const since = jst(now - 10 * 86400e3, 10);
   const snap = await db.collection('buckets').where(FieldPath.documentId(), '>=', since).get();

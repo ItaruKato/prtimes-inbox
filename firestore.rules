@@ -32,8 +32,28 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // 会社の台帳（取得処理が書く。Long List・Knowledge Base で使う）
     match /companies/{id} {
-      allow read, write: if false;
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /companyArticles/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+
+    // 「読む」にした記事の AI の下書き（Cloud Functions が書く）と、利用者のメモ
+    match /drafts/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /notes/{id} {
+      allow read, write: if isOwner();
+    }
+    // Knowledge Base への受け渡し（Cloud Functions が書く）
+    match /handoff/{id} {
+      allow read: if isOwner();
+      allow write: if false;
     }
 
     // 振り分け（日ごと）と、無期限で残す「読む」「既読」記事

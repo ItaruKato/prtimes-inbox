@@ -4,6 +4,7 @@ import { bucketKey, companyIdOf, mergeRaw, parseArticlePage, parseNewsSitemap, p
 import { ruleJudge } from './judge';
 import { indexOps } from './dayIndex';
 import type { Article } from './types';
+import { archiveOps, parseCompanyProfile, type CompanyProfile } from './company';
 
 const UA = 'prtimes-inbox/1.0 (personal reader; hourly)';
 const RSS_URL = 'https://prtimes.jp/index.rdf';
@@ -58,7 +59,7 @@ export async function collect(deps: CollectDeps): Promise<CollectResult> {
 }
 
 /** 1回の書き込み（バッチに入れる操作と、その大きさの見積もり） */
-interface Op {
+export interface Op {
   bytes: number;
   apply: (b: WriteBatch) => void;
 }
@@ -117,6 +118,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
     for (const s of await db.getAll(...refs)) if (s.exists) companyCache.set(s.id, s.data() as { name: string });
   }
   const sections = new Map<string, string>();
+  const profiles = new Map<string, CompanyProfile>();
   const newCompanies = new Map<string, string>();
   for (const r of todo) if (r.company) newCompanies.set(companyIdOf(r.id), r.company);
 
@@ -128,8 +130,12 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
     if (pageFetches > 0) await sleep(PAGE_FETCH_INTERVAL_MS);
     pageFetches++;
     try {
-      const page = parseArticlePage(await get(r.url));
+      const html = await get(r.url);
+      const page = parseArticlePage(html);
       if (page?.company) newCompanies.set(cid, page.company);
+      // 記事ページ下の「企業情報」（所在地・代表者・電話番号など）も台帳に入れる
+      const profile = parseCompanyProfile(html);
+      if (profile) profiles.set(cid, profile);
       if (page?.section) sections.set(r.id, page.section);
     } catch (e) {
       log('article page fetch failed', { url: r.url, error: String(e) });
@@ -142,6 +148,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
   let missingCompany = 0;
   const writes = new Map<string, Record<string, Partial<Article>>>(); // ドキュメントID → 書き込む記事
   const indexed: Article[] = []; // 目次（days）に載せる記事
+  const fresh: Article[] = []; // 新しく入った記事（会社ごとの記事一覧にも足す）
   for (const r of todo) {
     const cid = companyIdOf(r.id);
     const prev = planner.get(r.id);
@@ -174,6 +181,7 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
       added++;
       docId = planner.place(bucketKey(r.publishedAt), r.id, article);
       write = article;
+      if (company) fresh.push(article);
     }
     const w = writes.get(docId) ?? {};
     w[r.id] = write;
@@ -195,8 +203,22 @@ export async function store(deps: CollectDeps, input: RawItem[], label: string):
   }
   units.push(...indexOps(db, indexed));
   for (const [cid, name] of newCompanies)
-    if (!companyCache.has(cid))
-      units.push([{ bytes: 200, apply: (b) => b.set(db.collection('companies').doc(cid), { name, updatedAt: fetchedAt }) }]);
+    if (!companyCache.has(cid)) {
+      const profile = profiles.get(cid);
+      units.push([
+        {
+          bytes: 600,
+          apply: (b) =>
+            b.set(
+              db.collection('companies').doc(cid),
+              { name, updatedAt: fetchedAt, ...(profile ? { profile, profileAt: fetchedAt } : {}) },
+              { merge: true },
+            ),
+        },
+      ]);
+    }
+  // 会社ごとの記事一覧（companyArticles）。企業情報をまだ読んでいない新しい会社は読み込み待ちに並べる
+  units.push(...(await archiveOps(db, fresh, new Set(profiles.keys()))));
   units.push([
     {
       bytes: 200,

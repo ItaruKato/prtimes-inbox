@@ -13,7 +13,7 @@ interface Props {
   onAct: (id: string, st: Status) => void;
 }
 
-/** スワイプ：右→読む（読むの中では既読）、左→不要（不要の中では戻す） */
+/** スワイプ：右→読む（読むの中では読了）、左→不要（不要の中では戻す） */
 function swipeTarget(st: Status, dir: 1 | -1, back: Status): Status {
   if (dir > 0) return st === 'keep' ? 'done' : st === 'inbox' || st === 'cand' ? 'keep' : back;
   return st === 'drop' ? back : 'drop';
@@ -57,7 +57,7 @@ export const ArticleRow = memo(function ArticleRow({ it, st, selected, autoNote,
   return (
     <div className="rowwrap">
       <div className="swipebg" aria-hidden="true">
-        <span className="l">{st === 'keep' ? '既読にする' : st === 'drop' ? '戻す' : '✓ 読む'}</span>
+        <span className="l">{st === 'keep' ? '読了にする' : st === 'drop' ? '戻す' : '✓ 読む'}</span>
         <span className="r">{st === 'drop' ? '戻す' : '✕ 不要'}</span>
       </div>
       <div
@@ -87,7 +87,7 @@ export const ArticleRow = memo(function ArticleRow({ it, st, selected, autoNote,
             </>
           ) : st === 'keep' ? (
             <>
-              <button className="act keep" type="button" onClick={() => onAct(it.id, 'done')}>既読にする</button>
+              <button className="act keep" type="button" onClick={() => onAct(it.id, 'done')}>読了にする</button>
               <button className="act drop" type="button" onClick={() => onAct(it.id, 'drop')}>✕ 不要</button>
             </>
           ) : (

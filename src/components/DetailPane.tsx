@@ -6,6 +6,7 @@ import { fullDate } from '../lib/format';
 import { TagPills } from './TagPills';
 import { AI_SCORING } from '../lib/flags';
 import { ReasonBox } from './ReasonBox';
+import { NotePanel } from './NotePanel';
 
 /** 一覧は目次（タイトルなど）だけなので、開いた記事の全データを読み足す */
 function useFull(t: Triage, base: Item | undefined): { it: Item | undefined; loading: boolean } {
@@ -65,7 +66,7 @@ export function DetailPane({ t }: { t: Triage }) {
             <button className="btn keep" type="button" onClick={() => t.setStatus(it.id, 'keep')}>✓ 読む</button>
           )}
           {st === 'keep' && (
-            <button className="btn keep" type="button" onClick={() => t.setStatus(it.id, 'done')}>既読にする</button>
+            <button className="btn keep" type="button" onClick={() => t.setStatus(it.id, 'done')}>読了にする</button>
           )}
           {st !== 'drop' ? (
             <button className="btn drop" type="button" onClick={() => t.setStatus(it.id, 'drop')}>✕ 不要</button>
@@ -76,6 +77,7 @@ export function DetailPane({ t }: { t: Triage }) {
           )}
         </div>
         {st === 'drop' && <ReasonBox t={t} it={it} />}
+        {(st === 'keep' || st === 'done') && <NotePanel it={it} status={st} />}
         {AI_SCORING && (
           <div className="summary">
             <b>おすすめ度：{SCORE_LABEL[it.judge.score]}</b>

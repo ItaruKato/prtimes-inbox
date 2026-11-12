@@ -15,13 +15,13 @@ export const VIEWS: { k: Status; label: string; note?: string }[] = AI_SCORING
       { k: 'inbox', label: '受信箱', note: 'おすすめ度 高' },
       { k: 'cand', label: '候補', note: 'おすすめ度 中' },
       { k: 'keep', label: '読む' },
-      { k: 'done', label: '既読' },
+      { k: 'done', label: '読了' },
       { k: 'drop', label: '不要' },
     ]
   : [
       { k: 'inbox', label: '受信箱', note: '自動除外以外すべて' },
       { k: 'keep', label: '読む' },
-      { k: 'done', label: '既読' },
+      { k: 'done', label: '読了' },
       { k: 'drop', label: '不要' },
     ];
 

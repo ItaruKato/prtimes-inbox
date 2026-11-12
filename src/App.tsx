@@ -40,7 +40,7 @@ function WithFirebase() {
   return (
     <Inbox
       repo={repo}
-      source={(n) => `${rangeLabel(range)} ＋ 読む・既読 ${n}件`}
+      source={(n) => `${rangeLabel(range)} ＋ 読む・読了 ${n}件`}
       onSignOut={() => signOut(auth)}
       range={range}
       onRange={(k) => {

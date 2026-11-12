@@ -62,7 +62,7 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
           <span className="kbd">X</span> 不要
         </div>
         <div>
-          <span className="kbd">E</span> 既読 <span className="kbd">O</span> PR TIMESで開く
+          <span className="kbd">E</span> 読了 <span className="kbd">O</span> PR TIMESで開く
         </div>
       </div>
       {onSignOut && (

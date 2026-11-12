@@ -18,6 +18,7 @@ import type { Repo } from './repo';
 import { toItem } from '../lib/mode';
 import { rangeStart, type RangeKey } from '../lib/range';
 import { fromEntry, type IndexEntry } from '../lib/dayIndex';
+import { refreshHandoff, requestDraft } from '../lib/notes';
 
 /** JST の YYYYMMDD / YYYYMMDDHH */
 export function jstKey(ts: number, len: 8 | 10): string {
@@ -32,7 +33,7 @@ interface SavedDoc {
   decision: Decision;
 }
 
-/** range: 読み込む期間（受信箱・不要など）。「読む」「既読」は saved から期間に関係なく読む */
+/** range: 読み込む期間（受信箱・不要など）。「読む」「読了」は saved から期間に関係なく読む */
 export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo {
   const byId = new Map<string, Item>();
   /** saved にドキュメントがある記事（無い記事に削除を送らないため） */
@@ -127,7 +128,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
-            // 0件は普通にある（「読む」「既読」が空）。キャッシュの0件も受け取る（上と同じ理由）
+            // 0件は普通にある（「読む」「読了」が空）。キャッシュの0件も受け取る（上と同じ理由）
             if (!snap.docChanges().length && ready.saved) return;
             saved = new Map(snap.docs.map((d) => [d.id, d.data() as SavedDoc]));
             savedIds.clear();
@@ -216,7 +217,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
     },
 
     async saveDecisions(changes) {
-      // decisions/{記事の配信日} にまとめて書く。「読む」「既読」は記事ごと saved にも残す（無期限）
+      // decisions/{記事の配信日} にまとめて書く。「読む」「読了」は記事ごと saved にも残す（無期限）
       const ops: ((b: WriteBatch) => void)[] = [];
       const perDay = new Map<string, Record<string, Decision | ReturnType<typeof deleteField>>>();
       for (const [id, d] of Object.entries(changes)) {
@@ -255,6 +256,12 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         commits.push(batch.commit());
       }
       await Promise.all(commits);
+      // 書き込みが届いてから：「読む」は AI の下書きを頼み、「読了」は Knowledge Base への受け渡しを書き直す
+      // （どちらも、届かなかったときは Cloud Functions の予備の処理が拾う）
+      const moved = Object.entries(changes).filter(([, d]) => d && (d.status === 'keep' || d.status === 'done'));
+      if (moved.length && moved.length <= 20) {
+        for (const [id, d] of moved) void (d!.status === 'keep' ? requestDraft(id) : refreshHandoff(id));
+      }
     },
   };
 }
