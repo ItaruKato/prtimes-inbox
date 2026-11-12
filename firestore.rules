@@ -65,6 +65,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- Long List（ItaruKato/longlist）のデータ ----
+    // 一覧用のまとめ（台帳から作る）と処理の状態は、Long List の Cloud Functions だけが書く
+    match /longlistIndex/{chunk} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /longlistMeta/{doc} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    // 会社ごとの温度感・進捗・メモ・次にやること・担当（画面が書く）
+    match /longlist/{id} {
+      allow read, write: if isOwner();
+    }
+
     // ---- Knowledge Base（ItaruKato/knowledge）のデータ ----
     // 整理した記事・会社・テーマ・レポートは Knowledge Base の Cloud Functions だけが書く
     match /kbArticles/{id} {

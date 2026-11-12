@@ -10,6 +10,11 @@
       "collectionGroup": "days",
       "fieldPath": "items",
       "indexes": []
+    },
+    {
+      "collectionGroup": "longlistIndex",
+      "fieldPath": "rows",
+      "indexes": []
     }
   ]
 }
