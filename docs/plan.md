@@ -82,6 +82,7 @@
 
 ## Long List と Knowledge Base の分担（2026-11-12 本人が決定。二重に作らない）
 - **業界タグ（営業向け独自分類 30〜50種）**：分類表とタグを付ける処理は台帳側（このリポジトリの functions）に1つだけ置き、`companies/{会社ID}` に書く。Long List・Knowledge Base は読むだけ。**作るのは Long List のチャット**（Watcher・台帳の処理を足すので、作る前に本人に中身を相談する）。Knowledge Base はそれまで AI の仮の業界（`drafts.industry` など）を使い、できたら切り替える。
+- **売上・決算公告（会社 HP・記事から AI で拾う）**：業界タグと同じく台帳側の処理として `companies` に書く（出どころの URL と年度付き）。作るのは Long List のチャット（2026-11-12 本人が決定）。まず200社で試してから全社に広げる。官報は規約で機械的な収集が禁止なので読まない。
 - **会社ページ**：Knowledge Base が持つ（`https://prtimes-knowledge.web.app/` の下。住所の形は Knowledge Base で決めて、ここに書く）。Long List は自分の会社ページを作らず、リンクで飛ぶ。Knowledge Base の会社ページは Long List の温度感・進捗を読んで表示する（読むだけ）。
 - **コレクション名**：Knowledge Base は `kb` で始まる名前、Long List は `longlist` で始まる名前だけに書く。
 - **見た目**：共通の部品は作らず、Watcher の `src/index.css` の色・文字の決まり（`:root` の変数）をそれぞれ写してそろえる。
