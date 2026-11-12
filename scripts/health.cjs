@@ -24,7 +24,7 @@ const jst = (ms, len) => {
   };
   const now = Date.now();
 
-  for (const id of ['collector', 'backfill', 'backfillStore', 'ai', 'archive', 'profiles']) {
+  for (const id of ['collector', 'backfill', 'backfillStore', 'ai', 'archive', 'profiles', 'gbiz']) {
     const d = (await db.doc(`meta/${id}`).get()).data();
     log(`meta/${id}: ${JSON.stringify(d ?? null)}`);
   }
@@ -33,6 +33,8 @@ const jst = (ms, len) => {
   log(
     `台帳: companies ${await count('companies')}社 / companyArticles ${await count('companyArticles')}社 / 企業情報の読み込み待ち ${await count('profileQueue')}社`,
   );
+  const cn = (await db.collection('companies').where('corporateNumber', '>', '').count().get()).data().count;
+  log(`gBizINFO: 法人番号と結びついた会社 ${cn}社`);
   const draftDocs = await db.collection('drafts').get();
   const dstate = {};
   for (const d of draftDocs.docs) dstate[d.get('state')] = (dstate[d.get('state')] ?? 0) + 1;

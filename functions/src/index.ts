@@ -12,6 +12,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { morningMessage, morningSummary, sendToAll } from './morning';
 import { SpeechClient } from '@google-cloud/speech';
 import { archivePast, profileSweep } from './company';
+import { gbizFetcher, gbizSweep } from './gbiz';
 import { draftSweep } from './notes';
 import { runJobs } from './jobs';
 
@@ -20,6 +21,8 @@ const db = getFirestore();
 
 const common = { region: 'asia-northeast1', timeZone: 'Asia/Tokyo' } as const;
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
+/** gBizINFO（経済産業省）の API トークン（Secret Manager の GBIZINFO_TOKEN） */
+const gbizToken = defineSecret('GBIZINFO_TOKEN');
 
 /**
  * Claude による判定・要約を行うか。
@@ -100,6 +103,17 @@ export const archiveCompanies = onSchedule(
   { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
     await archivePast({ db, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/**
+ * gBizINFO で法人番号と結びつけ、代表者・資本金・従業員数・設立・事業内容を台帳に足す（10分ごと。1秒に1回までの間隔で）。
+ * 企業情報（所在地）を読み終えた会社が対象。所在地の都道府県と名前で1社に決まったときだけ結びつける。
+ */
+export const gbizCompanies = onSchedule(
+  { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB', secrets: [gbizToken] },
+  async () => {
+    await gbizSweep({ db, get: gbizFetcher(gbizToken.value()), log: (msg, data) => logger.info(msg, data) });
   },
 );
 

@@ -14,6 +14,7 @@ import { backfill, BACKFILL_FROM } from '../src/backfill';
 import { cleanup } from '../src/cleanup';
 import { archivePast, ARCHIVE_FROM, profileSweep } from '../src/company';
 import { runJobs } from '../src/jobs';
+import { gbizSweep } from '../src/gbiz';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BUCKET_TARGET_BYTES, docSize, indexEntries, LEAD_MAX } from '../src/buckets';
 import type { RawItem } from '../src/parse';
 import type { Article } from '../src/types';
@@ -458,6 +459,34 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     const counting = { beta: { messages: { parse: async () => ((calls += 1), client.beta.messages.parse({} as never)) } } } as unknown as Anthropic;
     await runJobs({ db, client: () => counting, recognize: async () => '' });
     expect(calls).toBe(0);
+  }, 60_000);
+
+  it('gBizINFO：企業情報のある会社を法人番号と結びつけ、決まらない会社は印だけ付ける', async () => {
+    await db.doc('companies/1').set({ name: '株式会社MUSE', profileAt: 'x', profile: { address: '東京都港区南青山2-2' } });
+    await db.doc('companies/2').set({ name: '株式会社テスト', profileAt: 'x', profile: { address: '東京都港区' } });
+    await db.doc('companies/3').set({ name: '株式会社まだ', profile: {} }); // 企業情報がまだ → 対象外
+    await db.doc('companies/4').set({ name: '株式会社済み', profileAt: 'x', gbizAt: 'y' });
+    const urls: string[] = [];
+    const get = async (url: string) => {
+      urls.push(url);
+      if (url.includes('/hojin/1234567890123')) return { 'hojin-infos': [{ corporate_number: '1234567890123', name: '株式会社ＭＵＳＥ', representative_name: '青木 俊介', employee_number: 30 }] };
+      if (url.includes('name=MUSE')) return { 'hojin-infos': [{ corporate_number: '1234567890123', name: '株式会社ＭＵＳＥ', location: '東京都港区南青山1-1' }] };
+      return { 'hojin-infos': [{ corporate_number: '9', name: '株式会社テスト', location: '大阪府' }, { corporate_number: '8', name: '株式会社テスト', location: '京都府' }] };
+    };
+    const r = await gbizSweep({ db, get, sleep: async () => {} });
+    expect(r).toMatchObject({ matched: 1, ambiguous: 1 });
+    expect(urls[0]).toContain('prefecture=13');
+    const c1 = (await db.doc('companies/1').get()).data()!;
+    expect(c1).toMatchObject({ corporateNumber: '1234567890123', gbizMatch: 'name', gbiz: { representative: '青木 俊介', employees: 30 } });
+    expect((await db.doc('companies/2').get()).data()).toMatchObject({ gbizMatch: 'ambiguous' });
+    expect((await db.doc('companies/3').get()).data()!.gbizAt).toBeUndefined();
+    // 利用上限などで失敗したら、その会社から次の回にやり直す
+    await db.doc('companies/5').set({ name: '株式会社エラー', profileAt: 'x', profile: { address: '東京都' } });
+    const r2 = await gbizSweep({ db, get: async () => { throw new Error('gBizINFO 429'); }, sleep: async () => {} });
+    expect(r2).toMatchObject({ error: 'Error: gBizINFO 429' });
+    expect((await db.doc('companies/5').get()).data()!.gbizAt).toBeUndefined();
+    const r3 = await gbizSweep({ db, get: async () => ({ 'hojin-infos': [] }), sleep: async () => {} });
+    expect(r3).toMatchObject({ none: 1 });
   }, 60_000);
 
   it('cleanup は30日より前の時間バケット（続きのドキュメントも）と振り分けだけを消す', async () => {

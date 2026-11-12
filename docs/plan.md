@@ -25,7 +25,8 @@
 - [x] ①Watcher：「既読」を「読了」に。「読む」にした記事に AI の下書き（要点・営業トークの切り口・相性のよいサービス・メモ）、メモの編集、音声メモ（話す → 文字起こし → AI が整える）、重要度★、自分用タグ
 - [x] Watcher の判定の対象を 2026-10-01 からに（backfill。画面は直近7日分を先に出し、古い分はあとから読み足す）
 - [x] ②台帳の準備：記事ページの「企業情報」（URL・業種・本社所在地・電話番号・代表者名・上場・資本金・設立）を companies に。過去1年分（2025-11-01〜）の記事を会社ごとに companyArticles へ
-- [ ] 法人番号・gBizINFO での名寄せ（申請の結果待ち）
+- [x] gBizINFO：会社名と所在地（都道府県）で検索し、1社に決まったら法人番号・代表者・資本金・従業員数・設立・事業内容を companies に（gbiz・corporateNumber・gbizMatch）
+- [ ] 法人番号API（国税庁）：申請済み・アプリケーションIDの到着待ち（1か月ほど）。gBizINFO で決まらなかった会社の名寄せに使う
 - [ ] ③Long List ／ ④Knowledge Base
 
 ## データの置き場所（Knowledge Base・Long List から読む）
@@ -34,7 +35,7 @@
 | `handoff/{記事ID}` | 読了にした記事の受け渡し：`v`（形式の版=1）、`article`（タイトル・会社・URL・配信日時・本文冒頭）、`readAt`、`memo`、`myTags`、`stars`（0〜3）、`draft`（AIの要点：summary・points・angles・fits・memo・industry）、`updatedAt` | Cloud Functions |
 | `drafts/{記事ID}` | AIの下書き（state: working / done / failed） | Cloud Functions |
 | `notes/{記事ID}` | 自分のメモ（memo・myTags・stars） | 画面 |
-| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt | Cloud Functions |
+| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous）、gbizAt | Cloud Functions |
 | `companyArticles/{会社ID}` | name、a.{記事ID} = { t: タイトル, p: 配信日時 } | Cloud Functions |
 | `profileQueue/{会社ID}` | 企業情報の読み込み待ち | Cloud Functions |
 | `jobs/{自動ID}` | 画面からの依頼（draft・handoff・transcribe）。1分ごとに処理し、1日で消す。画面から関数を直接呼ばない（外から呼べる入口を作らない）ため | 画面（依頼）・Cloud Functions（結果） |
