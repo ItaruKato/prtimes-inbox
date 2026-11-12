@@ -8,7 +8,8 @@ import { addUsage } from './notes';
 /**
  * 業界タグ（営業向けの独自分類。台帳の処理。Long List・Knowledge Base で共通に使う）。
  * 作ったのは Long List のチャット（2026-11-12 本人が決定：メイン1つ＋サブ2つまで、BtoB／BtoC も付ける）。
- * - 依頼：industryQueue/{会社ID}（models: 使う AI、apply: 台帳に書くか）。Long List の画面が書く
+ * - 依頼：industryQueue/{会社ID}（models: 使う AI、apply: 台帳に書く AI）。Long List の画面と、Long List の関数（まだタグのない会社を6時間ごとに）が書く
+ * - 全社に付ける AI は Opus（2026-11-12 本人が決定）
  * - AI（Claude）が、PR TIMES の記事の見出し・PR TIMES の業種・gBizINFO の事業の概要・HP の会社名から決める
  * - 書く：industryTrials/{会社ID}.{AI} に結果（お試しで AI を比べるため）。apply なら companies/{会社ID}.industryTags にも
  * - 分類の表は meta/industryTags にも書く（画面はそこから名前を読む）
@@ -151,8 +152,9 @@ export async function classifyIndustry(client: Anthropic, db: Firestore, key: Mo
   return { ...tidyIndustry(o), v: INDUSTRY_V, model: r.model ?? model, at: new Date().toISOString() };
 }
 
-const PER_RUN = 40;
-const PARALLEL = 4;
+/** 1回（5分ごと）に処理する数。全社（約5万社）を2日ほどで付ける */
+const PER_RUN = 80;
+const PARALLEL = 6;
 const MAX_TRIES = 3;
 const ID_RE = /^\d+$/;
 
