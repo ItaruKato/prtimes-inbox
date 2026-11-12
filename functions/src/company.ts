@@ -91,6 +91,13 @@ export async function profileSweep(deps: {
       const url = q.get('url') as string;
       try {
         const profile = parseCompanyProfile(await get(url));
+        const tries = ((q.get('tries') as number | undefined) ?? 0) + 1;
+        if (!profile && tries < PROFILE_MAX_TRIES) {
+          // 企業情報が見つからない（一時的に違うページが返った可能性もある）。あとでもう一度読む
+          missing++;
+          await q.ref.set({ tries, lastError: '企業情報が見つかりません' }, { merge: true });
+          continue;
+        }
         const batch = db.batch();
         batch.set(
           db.collection('companies').doc(q.id),
