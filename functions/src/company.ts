@@ -7,7 +7,7 @@ import { withLease } from './lease';
 /**
  * 会社の台帳づくり（Long List・Knowledge Base の土台）。
  * - companies/{会社ID}: name と profile（PR TIMES の記事ページ下の「企業情報」）
- * - companyArticles/{会社ID}: その会社の記事の一覧（a.{記事ID} = { t: タイトル, p: 配信日時 }）。過去1年分をさかのぼる
+ * - companyArticles/{会社ID}: その会社の記事の一覧（a.{記事ID} = { t: タイトル, p: 配信日時 }）。ARCHIVE_FROM（2025-01-01）までさかのぼる
  * - profileQueue/{会社ID}: 企業情報をまだ読んでいない会社（url: その会社の記事）
  */
 
@@ -125,10 +125,13 @@ export async function profileSweep(deps: {
   return r.value;
 }
 
-// ---- 過去1年分の記事を会社ごとにまとめる（companyArticles） ----
+// ---- 過去の記事を会社ごとにまとめる（companyArticles） ----
 
-/** ここまでさかのぼる（JST） */
-export const ARCHIVE_FROM = '2025-11-01T00:00:00+09:00';
+/**
+ * ここまでさかのぼる（JST）。2026-11-12 に本人の指示で 2025-11-01 から 2025-01-01 に早めた。
+ * 早めたときは、読み終えたところから続ける（resumeArchive）。
+ */
+export const ARCHIVE_FROM = '2025-01-01T00:00:00+09:00';
 const LIST_URL = 'https://prtimes.jp/main/html/newarrival';
 const ARCHIVE_INTERVAL_MS = 2500;
 const ARCHIVE_BUDGET_MS = 420_000;
@@ -151,6 +154,20 @@ interface ArchiveState {
 
 const dayStart = (day: string) => new Date(`${day}T00:00:00+09:00`).getTime();
 const prevDay = (day: string) => new Date(dayStart(day) - 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
+
+/**
+ * 保存してある進み具合から、今回どこから読むかを決める。
+ * さかのぼる日（from）を早めたときは、すでに読んだ日を読み直さずに続きから読む
+ * （読み終えていれば、前の from の前の日から）。それ以外で from が変わったときは今日から読み直す。
+ */
+export function resumeArchive(prev: Partial<ArchiveState>, from: string, today: string): ArchiveState {
+  if (prev.from === from && prev.day) return prev as ArchiveState;
+  if (prev.from && prev.day && new Date(from).getTime() < new Date(prev.from).getTime()) {
+    if (prev.done) return { ...(prev as ArchiveState), from, done: false, day: prevDay(prev.day), cursor: null, dayPages: 0 };
+    return { ...(prev as ArchiveState), from };
+  }
+  return { from, day: today };
+}
 const todayJst = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
 /** 記事を会社ごとの一覧に足す書き込み（新しい会社は台帳に入れ、企業情報の読み込み待ちに並べる） */
@@ -204,7 +221,7 @@ export async function archiveOps(
 /**
  * 新着一覧を1日ずつ古い方へ読み、会社ごとの記事一覧（companyArticles）を作る。
  * 一覧のカーソルは「UNIX時刻_番号」なので、その日の 24:00 を指定すると、その日から読める。
- * 進み具合は meta/archive に保存し、何回かに分けて ARCHIVE_FROM まで進める。
+ * 進み具合は meta/archive に保存し、何回かに分けて ARCHIVE_FROM まで進める（早めたときは続きから。resumeArchive）。
  */
 export async function archivePast(deps: {
   db: Firestore;
@@ -212,18 +229,20 @@ export async function archivePast(deps: {
   sleep?: (ms: number) => Promise<void>;
   log?: (msg: string, data?: Record<string, unknown>) => void;
   budgetMs?: number;
+  /** さかのぼる日（テスト用。ふだんは ARCHIVE_FROM） */
+  from?: string;
 }) {
   const { db } = deps;
+  const from = deps.from ?? ARCHIVE_FROM;
   const r = await withLease(db, 'archive', 540_000, async () => {
     const get = deps.get ?? httpGet;
     const sleep = deps.sleep ?? ((ms) => new Promise((res) => setTimeout(res, ms)));
     const until = Date.now() + (deps.budgetMs ?? ARCHIVE_BUDGET_MS);
     const ref = db.collection('meta').doc('archive');
     const prev = ((await ref.get()).data() ?? {}) as Partial<ArchiveState>;
-    const state: ArchiveState =
-      prev.from === ARCHIVE_FROM && prev.day ? (prev as ArchiveState) : { from: ARCHIVE_FROM, day: todayJst() };
+    const state = resumeArchive(prev, from, todayJst());
     if (state.done) return { done: true, pages: 0, items: 0 };
-    const fromMs = new Date(ARCHIVE_FROM).getTime();
+    const fromMs = new Date(from).getTime();
 
     let pages = 0;
     let stored = 0;

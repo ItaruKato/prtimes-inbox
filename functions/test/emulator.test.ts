@@ -12,7 +12,9 @@ import { store } from '../src/collect';
 import { enrich } from '../src/enrich';
 import { backfill, BACKFILL_FROM } from '../src/backfill';
 import { cleanup } from '../src/cleanup';
-import { archivePast, ARCHIVE_FROM, profileSweep } from '../src/company';
+import { archivePast, profileSweep } from '../src/company';
+
+const ARCHIVE_FROM = '2025-11-01T00:00:00+09:00';
 import { runJobs } from '../src/jobs';
 import { gbizSweep } from '../src/gbiz';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BUCKET_TARGET_BYTES, docSize, indexEntries, LEAD_MAX } from '../src/buckets';
@@ -380,7 +382,7 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     };
     await db.doc('meta/archive').set({ from: ARCHIVE_FROM, day: '2025-11-02' });
     await db.doc('companies/8').set({ name: '会社000000008', profile: { phone: '03' }, profileAt: '2026-11-01T00:00:00Z' });
-    const r = await archivePast({ db, get, sleep: async () => {} });
+    const r = await archivePast({ db, get, sleep: async () => {}, from: ARCHIVE_FROM });
     expect(r).toMatchObject({ done: true, pages: 3, items: 4 });
     const a7 = (await db.doc('companyArticles/7').get()).data()!;
     expect(Object.keys(a7.a).sort()).toEqual(['000000010.000000007', '000000012.000000007']);
@@ -390,7 +392,7 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     // 台帳にない会社だけ企業情報の読み込み待ちに並ぶ
     expect((await db.collection('profileQueue').get()).docs.map((d) => d.id).sort()).toEqual(['7', '9']);
     expect((await db.doc('companies/8').get()).data()!.profile).toEqual({ phone: '03' });
-    expect(await archivePast({ db, get: noFetch })).toMatchObject({ done: true, pages: 0 });
+    expect(await archivePast({ db, get: noFetch, from: ARCHIVE_FROM })).toMatchObject({ done: true, pages: 0 });
 
     const info = '<dl><dt>業種</dt><dd>情報通信</dd><dt>本社所在地</dt><dd>東京都</dd><dt>電話番号</dt><dd>03-0000-0000</dd></dl>';
     const p = await profileSweep({ db, get: async () => info, sleep: async () => {} });

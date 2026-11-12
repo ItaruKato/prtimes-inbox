@@ -99,7 +99,7 @@ export const companyProfiles = onSchedule(
   },
 );
 
-/** 過去1年分の記事を1日ずつさかのぼり、会社ごとの記事一覧を作る（10分ごと。終わったら何もしない） */
+/** 過去の記事（2025-01-01 まで）を1日ずつさかのぼり、会社ごとの記事一覧を作る（10分ごと。終わったら何もしない） */
 export const archiveCompanies = onSchedule(
   { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
