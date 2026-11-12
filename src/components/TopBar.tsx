@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TagFilter, Triage } from '../state/useTriage';
 import { TAGS, VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
@@ -9,6 +9,7 @@ const CHIPS: { k: TagFilter; label: string }[] = [{ k: 'all', label: 'すべて'
 export function TopBar({ t, range, onRange }: { t: Triage; range?: RangeKey; onRange?: (k: RangeKey) => void }) {
   const v = VIEWS.find((x) => x.k === t.view)!;
   const [confirm, setConfirm] = useState(false);
+  const qRef = useRef<HTMLInputElement>(null);
   useEffect(() => setConfirm(false), [t.view, t.tag, t.q]);
 
   const triageView = t.view === 'inbox' || t.view === 'cand';
@@ -21,15 +22,32 @@ export function TopBar({ t, range, onRange }: { t: Triage; range?: RangeKey; onR
         <span className="meta">
           {num(t.visible.length)}件{v.note ? ` ・ ${v.note}` : ''}
         </span>
-        <input
-          id="q"
-          className="search"
-          type="search"
-          placeholder="タイトル・会社名で検索"
-          aria-label="検索"
-          value={t.q}
-          onChange={(e) => t.setQ(e.target.value)}
-        />
+        <span className="search">
+          <input
+            ref={qRef}
+            id="q"
+            type="search"
+            enterKeyHint="search"
+            placeholder="タイトル・会社名で検索"
+            aria-label="検索"
+            value={t.q}
+            onChange={(e) => t.setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && t.q && (e.stopPropagation(), t.setQ(''))}
+          />
+          {t.q && (
+            <button
+              type="button"
+              className="searchclear"
+              aria-label="検索の文字を消す"
+              onClick={() => {
+                t.setQ('');
+                qRef.current?.focus();
+              }}
+            >
+              ×
+            </button>
+          )}
+        </span>
         {range && onRange && (
           <select
             id="range"

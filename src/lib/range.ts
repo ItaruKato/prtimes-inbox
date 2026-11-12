@@ -5,7 +5,7 @@ export const RANGES: { k: RangeKey; label: string }[] = [
   { k: '3', label: '直近3日' },
   { k: '7', label: '直近7日' },
   { k: '10', label: '直近10日' },
-  { k: 'all', label: '全期間（10/1〜）' },
+  { k: 'all', label: '10/1から' },
 ];
 
 export const rangeLabel = (k: RangeKey) => RANGES.find((r) => r.k === k)!.label;
