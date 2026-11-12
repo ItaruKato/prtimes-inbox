@@ -13,6 +13,7 @@ import { enrich } from '../src/enrich';
 import { backfill, BACKFILL_FROM } from '../src/backfill';
 import { cleanup } from '../src/cleanup';
 import { archivePast, ARCHIVE_FROM, profileSweep } from '../src/company';
+import { runJobs } from '../src/jobs';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BUCKET_TARGET_BYTES, docSize, indexEntries, LEAD_MAX } from '../src/buckets';
 import type { RawItem } from '../src/parse';
 import type { Article } from '../src/types';
@@ -388,6 +389,59 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     const c = (await db.doc('companies/42').get()).data();
     expect(c?.profile).toEqual({ representative: '山田太郎', phone: '03-1111-2222' });
     expect((await db.doc('profileQueue/42').get()).exists).toBe(false);
+  }, 60_000);
+
+  it('画面からの依頼：下書き・受け渡し・音声メモを処理し、音声は消す', async () => {
+    const id = '000000005.000000042';
+    await db.doc(`saved/${id}`).set({
+      article: { id, url: 'https://prtimes.jp/x', title: 'B社が資金調達', company: 'B社', publishedAt: '2026-11-10T10:00:00+09:00', lead: '冒頭' },
+      decision: { status: 'done', at: Date.now(), how: 'manual' },
+    });
+    await db.doc(`notes/${id}`).set({ memo: '・電話する', stars: 2, myTags: ['提案ネタ'] });
+    const usage = { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0 };
+    const client = {
+      beta: {
+        messages: {
+          parse: async () => ({
+            model: 'claude-opus-5-5',
+            stop_reason: 'end_turn',
+            usage,
+            parsed_output: { summary: '要約', points: [{ label: '調達額', value: '1億円' }], angles: ['切り口'], fits: [], memo: '・下書き', industry: 'SaaS' },
+          }),
+          create: async () => ({ model: 'claude-opus-5-5', stop_reason: 'end_turn', usage, content: [{ type: 'text', text: '・整えたメモ' }] }),
+        },
+      },
+    } as unknown as Anthropic;
+    const wav = Buffer.alloc(1_000_044, 1);
+    await db.doc('jobs/j1').set({ type: 'draft', id, state: 'ready', at: new Date() });
+    await db.doc('jobs/j2').set({ type: 'transcribe', title: 'B社が資金調達', company: 'B社', state: 'ready', at: new Date() });
+    await db.doc('jobs/j2/parts/0').set({ n: 0, data: wav.subarray(0, 800_000) });
+    await db.doc('jobs/j2/parts/1').set({ n: 1, data: wav.subarray(800_000) });
+    await db.doc('jobs/j3').set({ type: 'draft', id: '../x', state: 'ready', at: new Date() });
+    await db.doc('jobs/old').set({ type: 'handoff', id, state: 'done', at: new Date(Date.now() - 2 * 86400e3) });
+    let heard = 0;
+    const r = await runJobs({ db, client: () => client, recognize: async (b) => ((heard = b.length), 'えーと電話する') });
+    expect(r).toMatchObject({ draft: 1, transcribe: 1, cleaned: 1 });
+    expect(heard).toBe(1_000_044);
+    expect((await db.doc('jobs/j2').get()).data()).toMatchObject({ state: 'done', result: { transcript: 'えーと電話する', text: '・整えたメモ' } });
+    expect((await db.collection('jobs/j2/parts').get()).size).toBe(0);
+    expect((await db.doc('jobs/j3').get()).data()).toMatchObject({ state: 'failed' });
+    expect((await db.doc('jobs/old').get()).exists).toBe(false);
+    expect((await db.doc(`drafts/${id}`).get()).data()).toMatchObject({ state: 'done', summary: '要約', industry: 'SaaS' });
+    // 読了の記事は、下書きができた時点で受け渡しに入る
+    expect((await db.doc(`handoff/${id}`).get()).data()).toMatchObject({
+      v: 1,
+      memo: '・電話する',
+      stars: 2,
+      myTags: ['提案ネタ'],
+      draft: { summary: '要約', memo: '・下書き' },
+    });
+    // 同じ記事の下書きは作り直しの依頼がない限り作らない
+    await db.doc('jobs/j4').set({ type: 'draft', id, state: 'ready', at: new Date() });
+    let calls = 0;
+    const counting = { beta: { messages: { parse: async () => ((calls += 1), client.beta.messages.parse({} as never)) } } } as unknown as Anthropic;
+    await runJobs({ db, client: () => counting, recognize: async () => '' });
+    expect(calls).toBe(0);
   }, 60_000);
 
   it('cleanup は30日より前の時間バケット（続きのドキュメントも）と振り分けだけを消す', async () => {

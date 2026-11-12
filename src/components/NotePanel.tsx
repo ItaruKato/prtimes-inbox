@@ -27,7 +27,7 @@ export function NotePanel({ it, status }: { it: Item; status: Status }) {
   const [rec, setRec] = useState<'idle' | 'recording' | 'working' | 'error'>('idle');
   const [recErr, setRecErr] = useState('');
   const [sec, setSec] = useState(0);
-  const stopRef = useRef<(() => Promise<string>) | null>(null);
+  const stopRef = useRef<(() => Promise<Uint8Array>) | null>(null);
   const textRef = useRef(text);
   textRef.current = text;
 
@@ -164,7 +164,7 @@ export function NotePanel({ it, status }: { it: Item; status: Status }) {
             </button>
           ) : (
             <button className="btn rec" type="button" onClick={() => void startRec()} disabled={rec === 'working'}>
-              {rec === 'working' ? '文字にしています…' : '🎤 話して足す'}
+              {rec === 'working' ? '文字にしています（1分ほど）…' : '🎤 話して足す'}
             </button>
           )}
           <button className="btn" type="button" onClick={() => void saveMemo()} disabled={!dirty}>

@@ -50,6 +50,15 @@ service cloud.firestore {
     match /notes/{id} {
       allow read, write: if isOwner();
     }
+    // 画面から Cloud Functions への依頼（AIの下書き・受け渡し・音声メモ）。結果は Cloud Functions が書く
+    match /jobs/{job} {
+      allow read, create: if isOwner();
+      allow update, delete: if false;
+      match /parts/{part} {
+        allow create: if isOwner();
+        allow read, update, delete: if false;
+      }
+    }
     // Knowledge Base への受け渡し（Cloud Functions が書く）
     match /handoff/{id} {
       allow read: if isOwner();
