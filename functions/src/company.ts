@@ -64,9 +64,10 @@ export function parseCompanyProfile(html: string): CompanyProfile | null {
 
 // ---- 企業情報の読み込み（profileQueue を少しずつ減らす） ----
 
-const PROFILE_PER_RUN = 150;
-const PROFILE_INTERVAL_MS = 1500;
-const PROFILE_BUDGET_MS = 400_000;
+// 2026-11-13 本人の指示で速めた（150社・1.5秒あけ → 300社・1秒あけ。1時間に約1,800社）。関数の時間切れ（540秒）の前に止める
+const PROFILE_PER_RUN = 300;
+const PROFILE_INTERVAL_MS = 1000;
+const PROFILE_BUDGET_MS = 470_000;
 const PROFILE_MAX_TRIES = 3;
 
 export async function profileSweep(deps: {
