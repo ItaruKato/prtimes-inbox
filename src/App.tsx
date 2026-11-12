@@ -101,7 +101,7 @@ function Inbox({
       <Sidebar t={t} dataLabel={dataLabel} onSignOut={onSignOut} />
       <section className="main">
         {t.page === 'judge' ? (
-          <JudgePage t={t} />
+          <JudgePage t={t} range={range} onRange={onRange} />
         ) : t.page === 'review' ? (
           <Suspense fallback={<div className="empty">読み込み中…</div>}>
             <ReviewPage t={t} />

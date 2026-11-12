@@ -302,8 +302,8 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
 
     pages['222_2'] = page(
       [
-        { id: '000000003.000000001', t: '2026-11-01T00:30:00+0900' },
-        { id: '000000004.000000001', t: '2026-10-31T23:50:00+0900' },
+        { id: '000000003.000000001', t: '2026-10-01T00:30:00+0900' },
+        { id: '000000004.000000001', t: '2026-09-30T23:50:00+0900' },
       ],
       '333_3',
     );
@@ -316,6 +316,22 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     // 終わった後は何もしない
     expect(await backfill({ db, get: noFetch })).toMatchObject({ done: true, pages: 0 });
   }, 120_000);
+
+  it('さかのぼる日を古くしたら、前回たどり着いた日の続きから読む', async () => {
+    await db.doc('meta/backfill').set({ from: '2026-11-01T00:00:00+09:00', done: true, cursor: 'x', pages: 900, items: 30000 });
+    const seen: string[] = [];
+    const get = async (url: string) => {
+      seen.push(url.match(/pagination_cursor=([0-9_]+)/)?.[1] ?? 'first');
+      return (
+        `<article class="list-article"><a href="/main/html/rd/p/000000009.000000003.html"><h3 class="t">記事</h3></a>` +
+        `<time datetime="2026-09-30T23:00:00+0900"></time><a class="list-article__company-name-link" href="#">会社</a></article>`
+      );
+    };
+    const r = await backfill({ db, get, sleep: async () => {} });
+    expect(seen).toEqual([`${Math.floor(new Date('2026-11-01T00:00:00+09:00').getTime() / 1000)}_9999999`]);
+    expect(r).toMatchObject({ done: true });
+    expect((await db.doc('meta/backfill').get()).data()).toMatchObject({ from: BACKFILL_FROM, done: true, pages: 901 });
+  }, 60_000);
 
   it('会社の台帳：1日ずつさかのぼって会社ごとの記事一覧を作り、新しい会社の企業情報を読む', async () => {
     const page = (items: { id: string; t: string }[], next: string | null) =>

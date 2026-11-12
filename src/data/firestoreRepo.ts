@@ -10,6 +10,7 @@ import {
   where,
   writeBatch,
   type Firestore,
+  type Query,
   type WriteBatch,
 } from 'firebase/firestore';
 import type { AiStatus, Article, Decision, ExclusionConfig, Item, RuleReport } from '../types';
@@ -78,12 +79,13 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         onData({ items, decisions });
       };
       const fail = (e: Error) => onError(e);
+      let older: ReturnType<typeof setTimeout> | undefined;
 
-      const unsubs = [
-        onSnapshot(
-          since === null
-            ? collection(db, 'days')
-            : query(collection(db, 'days'), where(documentId(), '>=', jstKey(since, 8))),
+      /** 目次の購読（変わったドキュメントだけ作り直す）。first: 最初の結果が届いたら呼ぶ */
+      const watchDays = (q: Query, first?: () => void) => {
+        let got = false;
+        return onSnapshot(
+          q,
           // キャッシュ→サーバーの切り替わり（件数が同じでも）を受け取るため
           { includeMetadataChanges: true },
           (snap) => {
@@ -91,7 +93,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
             if (snap.metadata.fromCache && snap.empty) return;
             const changes = snap.docChanges();
             // 中身が変わっていない通知（キャッシュ→サーバーの確認だけ）は、作り直さない
-            if (!changes.length && ready.days) return;
+            if (!changes.length && got) return;
             for (const c of changes) {
               if (c.type === 'removed') {
                 dayItems.delete(c.doc.id);
@@ -102,11 +104,24 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
               list.sort((x, y) => y.ts - x.ts);
               dayItems.set(c.doc.id, list);
             }
-            ready.days = true;
+            if (!got) {
+              got = true;
+              first?.();
+            }
             emit();
           },
           fail,
-        ),
+        );
+      };
+      // 全期間は記事が多い（10月1日から約8万件）。先に直近7日分を読んで画面を出し、古い分は少し待ってから読み足す
+      // （同時に読むと、端末内の保存場所の読み込みが重なって最初の表示が遅れる）
+      const recentKey = jstKey((since ?? Date.now() - 7 * 86400e3), 8);
+      const unsubs = [
+        watchDays(query(collection(db, 'days'), where(documentId(), '>=', recentKey)), () => {
+          ready.days = true;
+          if (since === null && !older)
+            older = setTimeout(() => unsubs.push(watchDays(query(collection(db, 'days'), where(documentId(), '<', recentKey)))), 1500);
+        }),
         onSnapshot(
           since === null
             ? collection(db, 'decisions')
@@ -139,7 +154,10 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
           fail,
         ),
       ];
-      return () => unsubs.forEach((u) => u());
+      return () => {
+        clearTimeout(older);
+        unsubs.forEach((u) => u());
+      };
     },
 
     async loadArticle(id, publishedAt) {

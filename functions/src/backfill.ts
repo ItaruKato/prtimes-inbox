@@ -5,7 +5,7 @@ import { httpGet, store } from './collect';
 import { withLease } from './lease';
 
 /** ここまでさかのぼって取り込む（JST） */
-export const BACKFILL_FROM = '2026-11-01T00:00:00+09:00';
+export const BACKFILL_FROM = '2026-10-01T00:00:00+09:00';
 /** 1回の実行で読む一覧ページ数（1ページ40件） */
 const PAGES_PER_RUN = 60;
 /** 一覧ページを読む間隔（PR TIMES への負荷を抑える） */
@@ -100,7 +100,14 @@ async function run(deps: Parameters<typeof backfill>[0]) {
   const listUntil = startedAt + (deps.budgetMs ?? LIST_BUDGET_MS);
   const ref = db.collection('meta').doc('backfill');
   const prev = ((await ref.get()).data() ?? {}) as Partial<BackfillState>;
-  const state: BackfillState = prev.from === BACKFILL_FROM ? { ...prev, from: BACKFILL_FROM } : { from: BACKFILL_FROM };
+  // さかのぼる日を古くしたときは、前回たどり着いた日（prev.from）の続きから読む
+  // （一覧のカーソルは「UNIX時刻_番号」なので、その時刻より古い記事から読める）
+  const state: BackfillState =
+    prev.from === BACKFILL_FROM
+      ? { ...prev, from: BACKFILL_FROM }
+      : prev.done && prev.from && new Date(prev.from).getTime() > new Date(BACKFILL_FROM).getTime()
+        ? { from: BACKFILL_FROM, cursor: `${Math.floor(new Date(prev.from).getTime() / 1000)}_9999999`, pages: prev.pages, items: prev.items }
+        : { from: BACKFILL_FROM };
   if (state.done) return { done: true, pages: 0, stored: 0 };
 
   const fromMs = new Date(BACKFILL_FROM).getTime();

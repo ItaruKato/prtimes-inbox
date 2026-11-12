@@ -6,6 +6,7 @@ import { REASON_PRESETS } from '../lib/exclusion';
 import { fullDate, num } from '../lib/format';
 import { TagPills } from './TagPills';
 import { NotifyBox } from './NotifyBox';
+import { RANGES, type RangeKey } from '../lib/range';
 
 const LS_ORDER = 'prt-judge-order';
 const SWIPE = 90; // これ以上ずらしたら判定する（px）
@@ -13,7 +14,7 @@ const SWIPE = 90; // これ以上ずらしたら判定する（px）
 type Dir = 'keep' | 'drop';
 
 /** 判定：受信箱の記事を1件ずつカードで出し、読む／不要を決める（右スワイプ＝読む、左スワイプ＝不要） */
-export function JudgePage({ t }: { t: Triage }) {
+export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; onRange?: (k: RangeKey) => void }) {
   const [order, setOrder] = useState<'new' | 'old'>(() => {
     try {
       return localStorage.getItem(LS_ORDER) === 'old' ? 'old' : 'new';
@@ -117,6 +118,15 @@ export function JudgePage({ t }: { t: Triage }) {
           </span>
         </div>
         <div className="judgeopts">
+          {range && onRange && (
+            <select id="judge-range" className="rangesel" aria-label="対象の期間" value={range} onChange={(e) => onRange(e.target.value as RangeKey)}>
+              {RANGES.map((r) => (
+                <option key={r.k} value={r.k}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             id="judge-order"
             className="rangesel"
