@@ -33,7 +33,7 @@ function useFull(t: Triage, base: Item | undefined): { it: Item | undefined; loa
   };
 }
 
-/** スマホで記事の詳細を横にスワイプしたら一覧に戻る（これ以上ずらしたら戻る px／素早くはじいたとき） */
+/** スマホで記事の詳細を右にスワイプしたら一覧に戻る（これ以上ずらしたら戻る px／素早くはじいたとき） */
 const BACK_SWIPE = 80;
 const BACK_FLICK = { min: 35, speed: 0.4 };
 
@@ -56,7 +56,7 @@ export function DetailPane({ t }: { t: Triage }) {
     setLeaving(dir);
     setTimeout(() => t.setSel(null), 160);
   };
-  // 指での横スワイプ（右・左どちらでも）。メモの入力欄の中から始めたときは使わない
+  // 指での右スワイプ（左へは動かさない）。メモの入力欄の中から始めたときは使わない
   const onTouchStart = (e: React.TouchEvent) => {
     const el = ref.current;
     if (!el || e.touches.length !== 1 || getComputedStyle(el).position !== 'fixed') return;
@@ -76,14 +76,14 @@ export function DetailPane({ t }: { t: Triage }) {
     d.v = 0.6 * ((mx - d.dx) / Math.max(1, now - d.t)) + 0.4 * d.v;
     d.t = now;
     d.dx = mx;
-    setDx(mx);
+    setDx(Math.max(0, mx));
   };
   const onTouchEnd = () => {
     const d = drag.current;
     drag.current = null;
     if (!d || d.lock !== 'x') return;
     const flick = Math.abs(d.dx) >= BACK_FLICK.min && Math.abs(d.v) >= BACK_FLICK.speed && Math.sign(d.v) === Math.sign(d.dx);
-    if (Math.abs(d.dx) >= BACK_SWIPE || flick) close(Math.sign(d.dx));
+    if (d.dx > 0 && (d.dx >= BACK_SWIPE || flick)) close(1);
     else setDx(0);
   };
 
