@@ -99,10 +99,10 @@ async function main() {
     lines.push(`## ${key}〜${report.weekEnd}${report.complete ? '' : '（途中）'}  記事 ${inWeek.length}件`);
     for (const [id, s] of Object.entries(rules)) {
       const pct = inWeek.length ? ((s.excluded / inWeek.length) * 100).toFixed(1) : '0.0';
-      lines.push(`- ${s.label}（${id}${disabled.has(id) ? '・オフ' : ''}）: 除外 ${s.excluded}件（${pct}%） / 戻した ${s.restored}件${s.restoredTitles.length ? '：' + s.restoredTitles.join(' / ') : ''}`);
+      lines.push(`- ${s.label}（${id}${disabled.has(id) ? '・オフ' : ''}）: 除外 ${s.excluded}件（${pct}%） / 戻した ${s.restored}件`);
     }
     lines.push(`- 手動で不要 ${manualDrops.length}件（理由あり ${withReason.length}件） / どのルールにも当たらない理由あり ${uncovered.length}件 ${JSON.stringify(reasonTagCounts)}`);
-    for (const u of uncovered.slice(0, 15)) lines.push(`  - ${u.title}｜[${u.reasonTags.join(',')}] ${u.reason}`);
+    // 記事のタイトル・理由は記録（公開）に出さない。アプリの「点検」画面で見る
   }
   console.log(lines.join('\n'));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');

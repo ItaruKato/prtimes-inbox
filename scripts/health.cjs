@@ -125,19 +125,40 @@ const jst = (ms, len) => {
   const cfg = (await db.doc('config/exclusion').get()).data();
   log(`除外ルールの設定: ${JSON.stringify(cfg ?? null)}`);
   log(`手動で不要: ${manualDrops.length}件（理由あり ${withReason.length}件） / 理由の選択肢: ${JSON.stringify(tagCount)}`);
-  const recent = withReason.sort((a, b) => b.at - a.at).slice(0, 80);
-  log('不要にした理由（新しい順）:\n' + (recent.map((x) => `- at=${x.at}｜${x.title}｜${x.company}｜[${(x.reasonTags ?? []).join(',')}] ${x.reason ?? ''}`).join('\n') || '（なし）'));
-  log('ルールで除外された記事を戻した記録:\n' + (restored.map((x) => `- at=${x.at}｜[${x.ruleIds.join(',')}→${x.status}] ${x.title}｜${x.company}`).join('\n') || '（なし）'));
-  // 直近の手動判定（判定画面・一覧のどちらも。読む／既読／不要）
-  const manual = all.filter((x) => x.how === 'manual').sort((a, b) => b.at - a.at);
-  const since24 = now - 86400e3;
-  const last24 = manual.filter((x) => x.at >= since24);
+  // ここから下は、リポジトリが公開なので記録（Actions のログ）に出す中身を絞る：
+  // 利用者が読んだ記事・不要にした記事のタイトルや理由は出さず、件数だけにする。
+  // 例外は、夜中の見直しでルールを作る・直すのに必要な分（同じ理由が10件以上・戻した記録が2件以上）だけ。
+  const RULE_MIN = 10;
+  const RESTORE_MIN = 2;
+  // 材料は「まだどのルールにも当たらない理由あり」と「ルールの最終更新日より後に戻した記録」。
+  // ルールを作る・直すと材料から自然に外れるので、処理済みの時刻を数える必要はない
+  const { EXCLUSION_RULES } = require(path.join(__dirname, '..', 'functions', 'lib', 'src', 'lib', 'exclusion.js'));
+  const disabledRules = new Set(cfg?.disabledRules ?? []);
+  const asArticle = (x) => ({ id: x.id, title: x.title ?? '', company: x.company ?? '', lead: '', keywords: [], section: '', ticker: '', url: '', publishedAt: '' });
+  const covered = (x) => EXCLUSION_RULES.some((r) => !disabledRules.has(r.id) && r.test(asArticle(x)));
+  const fresh = withReason.filter((x) => !covered(x)).sort((a, b) => b.at - a.at);
+  const groups = {};
+  for (const x of fresh) for (const k of (x.reasonTags ?? []).length ? x.reasonTags : ['（自由記入のみ）']) (groups[k] ??= []).push(x);
+  log(`見直しの材料（どのルールにも当たらない「理由あり」${fresh.length}件）: ${JSON.stringify(Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length])))}`);
+  for (const [k, v] of Object.entries(groups))
+    if (v.length >= RULE_MIN)
+      log(`ルール化の候補「${k}」${v.length}件（${RULE_MIN}件以上）:\n` + v.map((x) => `- at=${x.at}｜${x.title}｜${x.company}${x.reason ? `｜${x.reason}` : ''}`).join('\n'));
+  const byRule = {};
+  for (const x of restored)
+    for (const r of x.ruleIds) {
+      const rule = EXCLUSION_RULES.find((e) => e.id === r);
+      if (rule && x.at > new Date(`${rule.updated}T00:00:00+09:00`).getTime()) (byRule[r] ??= []).push(x);
+    }
+  log(`ルールで除外された記事を戻した記録（ルールの最終更新日より後）: ${JSON.stringify(Object.fromEntries(Object.entries(byRule).map(([k, v]) => [k, v.length])))}`);
+  for (const [r, v] of Object.entries(byRule))
+    if (v.length >= RESTORE_MIN) log(`直す候補のルール「${r}」${v.length}件（${RESTORE_MIN}件以上）:\n` + v.map((x) => `- at=${x.at}｜→${x.status}｜${x.title}`).join('\n'));
+  // 直近の手動判定（判定画面・一覧のどちらも）は件数だけ
+  const manual = all.filter((x) => x.how === 'manual');
+  const last24 = manual.filter((x) => x.at >= now - 86400e3);
   const cnt = {};
   for (const x of last24) cnt[x.status] = (cnt[x.status] ?? 0) + 1;
   log(`直近24時間の手動判定: ${last24.length}件 ${JSON.stringify(cnt)}`);
-  log('直近の手動判定（新しい順）:\n' + (manual.slice(0, 80).map((x) => `- ${new Date(x.at).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}｜${x.status}｜${x.title}｜${x.company}${(x.reasonTags ?? []).length ? `｜[${x.reasonTags.join(',')}]` : ''}${x.reason ? ` ${x.reason}` : ''}`).join('\n') || '（なし）'));
-  const noReason = manualDrops.filter((x) => !(x.reason || (x.reasonTags ?? []).length)).sort((a, b) => b.at - a.at).slice(0, 40);
-  log('理由なしで不要にした記事（新しい順・参考）:\n' + (noReason.map((x) => `- ${x.title}｜${x.company}`).join('\n') || '（なし）'));
+  log(`理由なしで不要: ${manualDrops.length - withReason.length}件`);
 
   try {
     const errs = execSync(
