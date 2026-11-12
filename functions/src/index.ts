@@ -16,6 +16,7 @@ import { gbizFetcher, gbizSweep } from './gbiz';
 import { draftSweep } from './notes';
 import { runJobs } from './jobs';
 import { webSweep } from './web';
+import { industrySweep } from './industry';
 
 initializeApp();
 const db = getFirestore();
@@ -171,5 +172,16 @@ export const companyWebSweep = onSchedule(
   { ...common, schedule: 'every 5 minutes', timeoutSeconds: 300, memory: '512MiB', secrets: [anthropicKey] },
   async () => {
     await webSweep({ db, client: claude, log: (msg, data) => logger.info(msg, data) });
+  },
+);
+
+/**
+ * 業界タグ（industryQueue の依頼を5分ごとに少しずつ）。PR TIMES の記事の見出しなどから AI が決める。Long List・Knowledge Base で共通に使う台帳の処理。
+ * 結果は industryTrials に（お試しで AI を比べる）、依頼に apply があれば companies.industryTags にも書く。
+ */
+export const industryTagsSweep = onSchedule(
+  { ...common, schedule: 'every 5 minutes', timeoutSeconds: 300, memory: '512MiB', secrets: [anthropicKey] },
+  async () => {
+    await industrySweep({ db, client: claude, log: (msg, data) => logger.info(msg, data) });
   },
 );

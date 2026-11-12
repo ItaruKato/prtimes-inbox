@@ -46,6 +46,9 @@
 | `companyWeb/{会社ID}` | 会社 HP から読んだページ（url・pages[{url, title, text}]・at）。売上・決算公告などをあとで拾い直すときに使う（HP を読み直さない） | Cloud Functions |
 | `jobs/{自動ID}` | 画面からの依頼（draft・handoff・transcribe）。1分ごとに処理し、1日で消す。画面から関数を直接呼ばない（外から呼べる入口を作らない）ため | 画面（依頼）・Cloud Functions（結果） |
 | `longlistIndex/{番号}`・`longlistMeta/{doc}` | Long List の一覧用のまとめ（台帳から6時間ごとに作る。`rows` は1行1社の JSON 文字列）と処理の状態（ItaruKato/longlist） | Long List の Cloud Functions |
+| `industryQueue/{会社ID}` | 業界タグの依頼口（models: 使う AI の名前の一覧 sonnet / haiku / opus、apply: 台帳に書く AI、at・by・redo）。Long List の画面が書く。処理したら台帳の関数が消す | 画面（依頼）・Cloud Functions（処理） |
+| `industryTrials/{会社ID}` | 業界タグの AI ごとの答え（{AI}: main・subs・biz・confidence・reason・model・at）。お試しで AI を比べるため | Cloud Functions |
+| `longlistTrials/{お試しID}` | 業界タグのお試しで選んだ会社と、本人の見直し（○△×） | Long List の画面 |
 | `longlist/{会社ID}` | Long List の温度感・進捗・メモ・次にやること・担当、除外の手直し | Long List の画面 |
 | `kbArticles`・`kbBodies`・`kbCompanies`・`kbThemes`・`kbReports`・`kbMeta` | Knowledge Base が整理した記事・会社・テーマ・レポート（ItaruKato/knowledge） | Knowledge Base の Cloud Functions |
 | `kbJobs/{自動ID}`・`kbConfig/{doc}` | Knowledge Base の画面からの依頼（質問など）と画面の設定 | Knowledge Base の画面（依頼・設定）・Cloud Functions（結果） |
@@ -89,6 +92,7 @@
 ## Long List と Knowledge Base の分担（2026-11-12 本人が決定。二重に作らない）
 - **業界タグ（営業向け独自分類 30〜50種）**：分類表とタグを付ける処理は台帳側（このリポジトリの functions）に1つだけ置き、`companies/{会社ID}` に書く。Long List・Knowledge Base は読むだけ。**作るのは Long List のチャット**（Watcher・台帳の処理を足すので、作る前に本人に中身を相談する）。Knowledge Base はそれまで AI の仮の業界（`drafts.industry` など）を使い、できたら切り替える。
 - **会社 HP の読み込み（共通）**：台帳側の `companyWebSweep`（functions/src/web.ts、5分ごと）。作ったのは Knowledge Base のチャット（2026-11-12 本人が決定）。依頼は `webQueue/{会社ID}`。**HP の読み込みと Web 検索は、本人が画面で指示したときだけ動かす（費用対効果。依頼に manual: true を付ける。自動の依頼は消す）**。robots.txt を守り、トップと会社概要などを5ページまで1.5秒あけて読む。HP が台帳（PR TIMES の企業情報・gBizINFO）になければ AI の Web 検索で探し、会社名がページにあるときだけ使う。AI が正式な会社名・所在地・従業員数・資本金・売上高を出どころのページ付きで `companies.web` に書き、読んだページを `companyWeb` に残す。**Long List は HP を自分で読みに行かず、依頼は webQueue に書き、ページ本文は companyWeb を使う**（段階4の決算公告・売上もここから拾う。足りないページがあれば web.ts の読み方を直す）。
+- **業界タグ（作った：2026-11-12）**：台帳側の `industryTagsSweep`（functions/src/industry.ts、5分ごとに40社まで）。分類の表は industry.ts の `INDUSTRY_TAGS`（46種。`meta/industryTags` にも書く）。AI が PR TIMES の記事の見出し（新しい順に30件）・PR TIMES の業種・gBizINFO の事業の概要・HP の会社名から、メイン1つ＋サブ2つまで（なくてもよい）・BtoB／BtoC／両方・確かさ・理由を決める。依頼は `industryQueue`、AI ごとの答えは `industryTrials`、依頼の `apply` に AI の名前があれば `companies.industryTags` にも書く。まず200社で Sonnet → Haiku・Opus を比べ、本人が AI を決めてから全社に付ける（本人の決定）。
 - **売上・決算公告（会社 HP・記事から AI で拾う）**：業界タグと同じく台帳側の処理として `companies` に書く（出どころの URL と年度付き）。作るのは Long List のチャット（2026-11-12 本人が決定）。まず200社で試してから全社に広げる。官報は規約で機械的な収集が禁止なので読まない。
 - **会社ページ**：Knowledge Base が持つ。住所は `https://prtimes-knowledge.web.app/c/{会社ID}`（会社IDは PR TIMES の会社ID＝companies のドキュメントID）。Long List は自分の会社ページを作らず、このリンクで飛ぶ。Knowledge Base の会社ページは `longlist/{会社ID}` の `temperature`（A/B/C）と `progress`（未着手／アプローチ中／商談／受注／対象外）を読んで表示する（読むだけ）。Long List でこの名前を変えるときは、ここも直す。`longlist` のルールが入るまでは表示しない。
 - **コレクション名**：Knowledge Base は `kb` で始まる名前、Long List は `longlist` で始まる名前だけに書く。

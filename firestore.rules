@@ -88,6 +88,21 @@ service cloud.firestore {
     match /longlist/{id} {
       allow read, write: if isOwner();
     }
+    // 業界タグのお試し（選んだ会社と、本人の ○△× の見直し。画面が書く）
+    match /longlistTrials/{id} {
+      allow read, write: if isOwner();
+    }
+
+    // ---- 業界タグ（台帳の処理。Long List・Knowledge Base で共通） ----
+    // 依頼口（画面が書く。処理したら Cloud Functions が消す）と、AI ごとの結果（Cloud Functions が書く）
+    match /industryQueue/{id} {
+      allow read, create, update: if isOwner();
+      allow delete: if false;
+    }
+    match /industryTrials/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
 
     // ---- Knowledge Base（ItaruKato/knowledge）のデータ ----
     // 整理した記事・会社・テーマ・レポートは Knowledge Base の Cloud Functions だけが書く
