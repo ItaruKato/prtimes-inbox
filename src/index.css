@@ -61,6 +61,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .searchclear{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:50%;background:var(--line);color:var(--ink-2);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
 /* iPhone：文字の大きさが 16px 未満の入力欄を押すと画面が拡大されるので、指で操作する端末では 16px にする */
 @media (pointer:coarse){input,select,textarea{font-size:16px !important}}
+@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px !important}}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--ink-2);white-space:nowrap}
