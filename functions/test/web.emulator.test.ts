@@ -62,7 +62,7 @@ describe.skipIf(!HOST)('会社 HP の読み込み（エミュレーター）', (
 
   it('台帳の HP を robots.txt を守って読み、出どころ付きで台帳に書く', async () => {
     await db.doc('companies/100').set({ name: '株式会社テスト商事', profile: { url: 'https://www.test-shoji.co.jp/' } });
-    await db.doc('webQueue/100').set({ at: new Date(), by: 'test' });
+    await db.doc('webQueue/100').set({ at: new Date(), by: 'test', manual: true });
     const seen: string[] = [];
     const r = await webSweep({ db, client: fakeClient(answer, seen), get, sleep: async () => {} });
     expect(r).toMatchObject({ done: 1, left: 0 });
@@ -73,20 +73,29 @@ describe.skipIf(!HOST)('会社 HP の読み込み（エミュレーター）', (
     expect((await db.doc('companyWeb/100').get()).get('pages')).toHaveLength(2);
 
     // 読んだばかりなら、もう一度依頼されても読まない（redo なら読む）
-    await db.doc('webQueue/100').set({ at: new Date() });
+    await db.doc('webQueue/100').set({ at: new Date(), manual: true });
     expect(await webSweep({ db, client: fakeClient(answer, []), get, sleep: async () => {} })).toMatchObject({ fresh: 1 });
-    await db.doc('webQueue/100').set({ at: new Date(), redo: true });
+    await db.doc('webQueue/100').set({ at: new Date(), redo: true, manual: true });
     expect(await webSweep({ db, client: fakeClient(answer, []), get, sleep: async () => {} })).toMatchObject({ done: 1 });
+  });
+
+  it('人が指示していない依頼（manual がない）は読まずに消す', async () => {
+    await db.doc('companies/100').set({ name: '株式会社テスト商事', profile: { url: 'https://www.test-shoji.co.jp/' } });
+    await db.doc('webQueue/100').set({ at: new Date(), by: 'knowledge' });
+    const seen: string[] = [];
+    expect(await webSweep({ db, client: fakeClient(answer, seen), get, sleep: async () => {} })).toMatchObject({ notManual: 1, left: 0 });
+    expect(seen).toHaveLength(0);
+    expect((await db.doc('companies/100').get()).get('web')).toBeUndefined();
   });
 
   it('台帳に HP がなければ Web 検索で探し、会社名がページにあるときだけ使う', async () => {
     await db.doc('companies/200').set({ name: '株式会社テスト商事' });
-    await db.doc('webQueue/200').set({ at: new Date() });
+    await db.doc('webQueue/200').set({ at: new Date(), manual: true });
     expect(await webSweep({ db, client: fakeClient(answer, [], 'https://www.test-shoji.co.jp/'), get, sleep: async () => {} })).toMatchObject({ done: 1 });
     expect((await db.doc('companies/200').get()).get('web.urlFrom')).toBe('search');
 
     await db.doc('companies/300').set({ name: '株式会社まったく別' });
-    await db.doc('webQueue/300').set({ at: new Date() });
+    await db.doc('webQueue/300').set({ at: new Date(), manual: true });
     expect(await webSweep({ db, client: fakeClient(answer, [], 'https://www.test-shoji.co.jp/'), get, sleep: async () => {} })).toMatchObject({ nosite: 1 });
     expect((await db.doc('companies/300').get()).get('web.state')).toBe('nosite');
   });

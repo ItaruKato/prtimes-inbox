@@ -9,7 +9,7 @@ import type { CompanyProfile } from './company';
 
 /**
  * 会社 HP の読み込み（台帳の処理。Long List・Knowledge Base で共通に使う）。
- * - 依頼：webQueue/{会社ID}（Knowledge Base が読んだ会社を自動で、会社ページのボタンでも依頼する。Long List も依頼してよい）
+ * - 依頼：webQueue/{会社ID}。費用対効果のため、人が画面で指示したときだけ（manual: true。Knowledge Base の会社ページのボタンなど）。自動の依頼（manual がないもの）は読まずに消す
  * - HP の住所：PR TIMES の企業情報 → gBizINFO → なければ AI の Web 検索で探す（会社名がページにあるときだけ使う）
  * - 読み方：robots.txt を守り、トップと会社概要などのページを5ページまで、1.5秒あけて読む
  * - AI（Claude）が、正式な会社名・所在地・従業員数・資本金・売上高を、出どころのページ付きで拾う
@@ -422,6 +422,12 @@ export async function webSweep(deps: {
     const counts: Record<string, number> = {};
     for (const d of q.docs) {
       if (Date.now() >= until) break;
+      // 人が指示した依頼だけ読む（HP の読み込み・Web 検索は費用がかかるので、自動では動かさない）
+      if (d.get('manual') !== true) {
+        await d.ref.delete();
+        counts.notManual = (counts.notManual ?? 0) + 1;
+        continue;
+      }
       const company = await db.collection('companies').doc(d.id).get();
       const webAt = company.get('webAt') as string | undefined;
       if (!d.get('redo') && webAt && Date.now() - new Date(webAt).getTime() < REFRESH_DAYS * 86400e3) {
