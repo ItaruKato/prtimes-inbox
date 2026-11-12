@@ -292,3 +292,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 .angles,.fits{margin:2px 0 0;padding-left:1.2em;display:grid;gap:4px;color:var(--ink);font-size:13px}
 .fits .pill{display:inline-block;border:1px solid var(--accent-soft);border-radius:999px;padding:0 8px;font-size:11px;color:var(--accent);margin-right:4px}
 .linkbtn{border:0;background:none;color:var(--ink-3);text-decoration:underline;padding:0;align-self:flex-start;cursor:pointer}
+
+/* 会社の情報（判定カード・記事の詳細） */
+.facts{display:flex;flex-direction:column;gap:4px}
+.factchips{display:flex;flex-wrap:wrap;gap:4px}
+.factchips span{font-size:11px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.factyear{color:var(--ink-2)}
+/* 同じ発表（判定） */
+.samebox{border:1px solid var(--accent-soft);background:color-mix(in srgb,var(--surface) 92%,var(--accent));border-radius:10px;padding:6px 10px;font-size:12px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;max-width:640px;width:100%;margin:0 auto;flex:none}
+.samebox details{color:var(--ink-2)}
+.samebox summary{cursor:pointer}
+.samebox details[open]{flex-basis:100%;max-height:30vh;overflow:auto}
+.facts.compact{gap:2px;font-size:12px;color:var(--ink-2)}
+.factline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.samebox.off{opacity:.6}
+.samebox .samehead{display:flex;gap:6px;align-items:center;font-weight:600;color:var(--ink)}
+.samebox ul{margin:0;padding-left:1.4em;display:grid;gap:2px}
+.samebox a{color:var(--ink);text-decoration:none}

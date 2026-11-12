@@ -35,6 +35,9 @@ const GAME_RE = new RegExp(
 // 景品・プレゼントとしてゲーム機が出てくるだけの記事は除外しない
 const PRIZE_RE = /当たる|プレゼント|抽選/;
 
+/** 文（タイトルなど）に当てはまる注目テーマ */
+export const themesOf = (text: string): TagKey[] => RULES.filter((r) => r.re.test(text)).map((r) => r.k);
+
 const STRONG_RE = new RegExp(RULES.filter((r) => r.k === 'fund' || r.k === 'ipo' || r.k === 'ma').map((r) => r.re.source).join('|'));
 const NEW_GAME_RE = /新作|配信開始|事前登録|リリース/;
 

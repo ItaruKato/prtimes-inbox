@@ -221,7 +221,7 @@ export function useTriage(repo: Repo) {
    * opts.reasonTags: 不要の理由（判定画面で選んだもの）／ opts.quiet: 通知を出さない（判定画面は自分で出す）
    */
   const setStatus = useCallback(
-    (id: string, status: Status, opts: { reasonTags?: string[]; quiet?: boolean } = {}): (() => void) | undefined => {
+    (id: string, status: Status, opts: { reasonTags?: string[]; quiet?: boolean; how?: Decision['how'] } = {}): (() => void) | undefined => {
       const it = byId.get(id);
       if (!it) return undefined;
       if (status === 'drop') sticky.current.set(id, it);
@@ -232,7 +232,7 @@ export function useTriage(repo: Repo) {
           ? null
           : {
               status,
-              how: 'manual',
+              how: opts.how ?? 'manual',
               at: Date.now(),
               title: it.title,
               company: it.company,

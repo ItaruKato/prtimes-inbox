@@ -41,8 +41,8 @@ export type Status = 'inbox' | 'cand' | 'keep' | 'done' | 'drop';
 /** ユーザーの振り分け操作。学習データにもなる */
 export interface Decision {
   status: Status;
-  /** manual: 1件ずつの操作 / bulk: まとめて不要（学習には弱めに反映） */
-  how: 'manual' | 'bulk';
+  /** manual: 1件ずつの操作 / bulk: まとめて不要（学習には弱めに反映） / dup: 同じ発表の別の記事として、判定と一緒に不要にした */
+  how: 'manual' | 'bulk' | 'dup';
   at: number;
   /** 学習用：振り分けたときの記事タイトル・会社名・AIのおすすめ度 */
   title?: string;

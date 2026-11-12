@@ -7,6 +7,8 @@ import { fullDate, num } from '../lib/format';
 import { TagPills } from './TagPills';
 import { NotifyBox } from './NotifyBox';
 import { RANGES, type RangeKey } from '../lib/range';
+import { relatedItems } from '../lib/sameEvent';
+import { CompanyFactsView } from './CompanyFactsView';
 
 const LS_ORDER = 'prt-judge-order';
 const SWIPE = 70; // これ以上ずらしたら判定する（px）
@@ -44,6 +46,13 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
   const cur = queue[0];
   const next = queue[1];
 
+  // 同じ発表とみられる別の記事（受信箱の中から）。まとめて判定する
+  const { items: allItems, statusOf } = t;
+  const inboxAll = useMemo(() => allItems.filter((it) => statusOf(it) === 'inbox'), [allItems, statusOf]);
+  const related = useMemo(() => (cur ? relatedItems(cur, inboxAll) : []), [cur, inboxAll]);
+  const [groupOff, setGroupOff] = useState<string | null>(null);
+  const grouped = related.length > 0 && groupOff !== cur?.id;
+
   // 本文の冒頭などを読む（いまの記事と次の2件は先に読んでおく）
   const [full, setFull] = useState<Record<string, Article | null>>({});
   useEffect(() => {
@@ -59,16 +68,24 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
   const commit = useCallback(
     (dir: Dir | 'skip') => {
       if (!cur) return;
+      const others = grouped ? related : [];
       if (dir === 'skip') {
-        setSkipped((s) => new Set(s).add(cur.id));
+        setSkipped((s) => {
+          const n = new Set(s).add(cur.id);
+          for (const o of others) n.add(o.id);
+          return n;
+        });
       } else {
-        const undo = t.setStatus(cur.id, dir as Status, { quiet: true, reasonTags: dir === 'drop' ? reasons : undefined });
+        const undos = [t.setStatus(cur.id, dir as Status, { quiet: true, reasonTags: dir === 'drop' ? reasons : undefined })];
+        // 同じ発表の別の記事は「不要（同じ発表）」にする（読むにしたときも、読むのは1件で足りるため）
+        for (const o of others) undos.push(t.setStatus(o.id, 'drop', { quiet: true, how: 'dup' }));
+        const undo = () => undos.forEach((u) => u?.());
         setHistory((h) => [...h.slice(-49), { id: cur.id, dir, undo }]);
       }
       setReasons([]);
       setLeaving(null);
     },
-    [cur, reasons, t],
+    [cur, reasons, t, grouped, related],
   );
 
   /** カードを飛ばしてから判定する（ボタン・キーボード・スワイプ共通） */
@@ -176,6 +193,28 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
           />
         )}
       </div>
+
+      {cur && related.length > 0 && (
+        <div className={grouped ? 'samebox' : 'samebox off'} aria-label="同じ発表とみられる記事">
+          <label className="samehead">
+            <input type="checkbox" checked={grouped} onChange={(e) => setGroupOff(e.target.checked ? null : cur.id)} />
+            同じ発表 {related.length}件もまとめて判定
+          </label>
+          <details>
+            <summary>記事を見る（まとめた記事は「不要」に）</summary>
+            <ul>
+              {related.map((r) => (
+                <li key={r.id}>
+                  <a href={r.url} target="_blank" rel="noopener noreferrer">
+                    {r.title}
+                  </a>
+                  <span className="muted">｜{r.company}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
 
       {cur && (
         <div className="reasonchips judgereasons" role="group" aria-label="不要の理由（任意）">
@@ -326,6 +365,7 @@ function Card({
       </div>
       <h2 className="cardtitle">{it.title}</h2>
       <div className="cardcompany">{it.company}</div>
+      {!behind && <CompanyFactsView articleId={it.id} compact />}
       {summary && <p className="cardsummary">{summary}</p>}
       <div className="cardlead">{full === undefined ? '本文を読み込み中…' : lead || '本文の冒頭はありません。'}</div>
       <a className="btn cardopen" href={it.url} target="_blank" rel="noopener noreferrer">

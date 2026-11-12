@@ -7,6 +7,7 @@ import { TagPills } from './TagPills';
 import { AI_SCORING } from '../lib/flags';
 import { ReasonBox } from './ReasonBox';
 import { NotePanel } from './NotePanel';
+import { CompanyFactsView } from './CompanyFactsView';
 
 /** 一覧は目次（タイトルなど）だけなので、開いた記事の全データを読み足す */
 function useFull(t: Triage, base: Item | undefined): { it: Item | undefined; loading: boolean } {
@@ -60,6 +61,7 @@ export function DetailPane({ t }: { t: Triage }) {
           <span>{it.company || '（会社名未取得）'}</span>
           <span className="when">{fullDate(it.ts)} 配信</span>
         </div>
+        <CompanyFactsView articleId={it.id} />
         <div className="dacts">
           <a className="btn primary" href={it.url} target="_blank" rel="noopener noreferrer">PR TIMESで開く ↗</a>
           {(st === 'inbox' || st === 'cand' || st === 'drop') && (
