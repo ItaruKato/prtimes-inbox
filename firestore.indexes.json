@@ -1,5 +1,19 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "kbIndex",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "emb",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
+    }
+  ],
   "fieldOverrides": [
     {
       "collectionGroup": "buckets",

@@ -131,6 +131,11 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // 全記事の目録（2026-09-01 以降。種類・業界・事例らしさと、意味で探すための数値）。Knowledge Base の関数だけが書く
+    match /kbIndex/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
     // 画面からの依頼（質問・テーマの承認など）。結果は Cloud Functions が書く（画面から関数を直接呼ばない）
     match /kbJobs/{job} {
       allow read, create: if isOwner();

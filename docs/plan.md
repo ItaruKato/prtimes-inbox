@@ -50,7 +50,7 @@
 | `industryTrials/{会社ID}` | 業界タグの AI ごとの答え（{AI}: main・subs・biz・confidence・reason・model・at）。お試しで AI を比べるため | Cloud Functions |
 | `longlistTrials/{お試しID}` | 業界タグのお試しで選んだ会社と、本人の見直し（○△×） | Long List の画面 |
 | `longlist/{会社ID}` | Long List の温度感・進捗・メモ・次にやること・担当、除外の手直し | Long List の画面 |
-| `kbArticles`・`kbBodies`・`kbCompanies`・`kbThemes`・`kbReports`・`kbMeta` | Knowledge Base が整理した記事・会社・テーマ・レポート（ItaruKato/knowledge） | Knowledge Base の Cloud Functions |
+| `kbArticles`・`kbBodies`・`kbIndex`・`kbCompanies`・`kbThemes`・`kbReports`・`kbMeta` | Knowledge Base が整理した記事・会社・テーマ・レポートと、全記事の目録 kbIndex（意味で探すための数値 emb つき。firestore.indexes.json にベクトルの索引）（ItaruKato/knowledge） | Knowledge Base の Cloud Functions |
 | `kbJobs/{自動ID}`・`kbConfig/{doc}` | Knowledge Base の画面からの依頼（質問など）と画面の設定 | Knowledge Base の画面（依頼・設定）・Cloud Functions（結果） |
 
 会社IDは PR TIMES の会社ID（記事IDの後ろの数字）。法人番号での名寄せは、申請が通ったあとに companies に `corporateNumber` を足す。
