@@ -29,7 +29,8 @@
 - [x] ②台帳の準備：記事ページの「企業情報」（URL・業種・本社所在地・電話番号・代表者名・上場・資本金・設立）を companies に。過去1年分（2025-11-01〜）の記事を会社ごとに companyArticles へ
 - [x] gBizINFO：会社名と所在地（都道府県）で検索し、1社に決まったら法人番号・代表者・資本金・従業員数・設立・事業内容を companies に（gbiz・corporateNumber・gbizMatch）
 - [ ] 法人番号API（国税庁）：申請済み・アプリケーションIDの到着待ち（1か月ほど）。gBizINFO で決まらなかった会社の名寄せに使う
-- [ ] ③Long List ／ ④Knowledge Base
+- [ ] ③Long List
+- [ ] ④Knowledge Base（ItaruKato/knowledge、https://prtimes-knowledge.web.app）：ひな形・自動デプロイ・`kb` のルールまで。計画と決まったことは knowledge の `docs/plan.md`
 
 ## データの置き場所（Knowledge Base・Long List から読む）
 | コレクション | 中身 | 書く人 |
@@ -41,6 +42,8 @@
 | `companyArticles/{会社ID}` | name、a.{記事ID} = { t: タイトル, p: 配信日時 } | Cloud Functions |
 | `profileQueue/{会社ID}` | 企業情報の読み込み待ち | Cloud Functions |
 | `jobs/{自動ID}` | 画面からの依頼（draft・handoff・transcribe）。1分ごとに処理し、1日で消す。画面から関数を直接呼ばない（外から呼べる入口を作らない）ため | 画面（依頼）・Cloud Functions（結果） |
+| `kbArticles`・`kbCompanies`・`kbThemes`・`kbReports`・`kbMeta` | Knowledge Base が整理した記事・会社・テーマ・レポート（ItaruKato/knowledge） | Knowledge Base の Cloud Functions |
+| `kbJobs/{自動ID}`・`kbConfig/{doc}` | Knowledge Base の画面からの依頼（質問など）と画面の設定 | Knowledge Base の画面（依頼・設定）・Cloud Functions（結果） |
 
 会社IDは PR TIMES の会社ID（記事IDの後ろの数字）。法人番号での名寄せは、申請が通ったあとに companies に `corporateNumber` を足す。
 
@@ -73,6 +76,13 @@
 - 先行事例の切り口：業界・テーマ・規模/段階・課題/狙い
 - 会社ページ：PR TIMES 記事の時系列、調達・M&A の履歴、会社の基本情報、自分のメモと接点
 - 音声メモ・AI の下書きは Watcher で作る（Knowledge Base は受け取って整理する側）
+
+## Long List と Knowledge Base の分担（2026-11-12 本人が決定。二重に作らない）
+- **業界タグ（営業向け独自分類 30〜50種）**：分類表とタグを付ける処理は台帳側（このリポジトリの functions）に1つだけ置き、`companies/{会社ID}` に書く。Long List・Knowledge Base は読むだけ。**作るのは Long List のチャット**（Watcher・台帳の処理を足すので、作る前に本人に中身を相談する）。Knowledge Base はそれまで AI の仮の業界（`drafts.industry` など）を使い、できたら切り替える。
+- **会社ページ**：Knowledge Base が持つ（`https://prtimes-knowledge.web.app/` の下。住所の形は Knowledge Base で決めて、ここに書く）。Long List は自分の会社ページを作らず、リンクで飛ぶ。Knowledge Base の会社ページは Long List の温度感・進捗を読んで表示する（読むだけ）。
+- **コレクション名**：Knowledge Base は `kb` で始まる名前、Long List は `longlist` で始まる名前だけに書く。
+- **見た目**：共通の部品は作らず、Watcher の `src/index.css` の色・文字の決まり（`:root` の変数）をそれぞれ写してそろえる。
+- **自動デプロイの許可**：Workload Identity のプロバイダの条件は `ItaruKato/prtimes-inbox`・`ItaruKato/longlist`・`ItaruKato/knowledge` の3つ（本人が設定済み）。書き直すときは3つとも残す。`roles/iam.workloadIdentityUser` は prtimes-inbox と knowledge に付いている（longlist は自分の分を本人に足してもらう）。
 
 ## 共有の決まり（上書き事故を防ぐ）
 同じ Firebase プロジェクト `prtimes-inbox`（asia-northeast1）を3つのアプリで使う。次を守らないと、ほかのアプリの本番を消したり上書きしたりする。

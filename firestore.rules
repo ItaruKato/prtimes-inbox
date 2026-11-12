@@ -65,6 +65,38 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- Knowledge Base（ItaruKato/knowledge）のデータ ----
+    // 整理した記事・会社・テーマ・レポートは Knowledge Base の Cloud Functions だけが書く
+    match /kbArticles/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /kbCompanies/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /kbThemes/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /kbReports/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    match /kbMeta/{doc} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+    // 画面からの依頼（質問・テーマの承認など）。結果は Cloud Functions が書く（画面から関数を直接呼ばない）
+    match /kbJobs/{job} {
+      allow read, create: if isOwner();
+      allow update, delete: if false;
+    }
+    // 画面の設定
+    match /kbConfig/{doc} {
+      allow read, write: if isOwner();
+    }
+
     // 振り分け（日ごと）と、無期限で残す「読む」「既読」記事
     match /decisions/{day} {
       allow read, write: if isOwner();
