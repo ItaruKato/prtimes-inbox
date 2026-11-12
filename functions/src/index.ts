@@ -15,6 +15,7 @@ import { archivePast, profileSweep } from './company';
 import { gbizFetcher, gbizSweep } from './gbiz';
 import { draftSweep } from './notes';
 import { runJobs } from './jobs';
+import { webSweep } from './web';
 
 initializeApp();
 const db = getFirestore();
@@ -158,5 +159,17 @@ export const runJobsEveryMinute = onSchedule(
       },
       log: (msg, data) => logger.info(msg, data),
     });
+  },
+);
+
+/**
+ * 会社 HP の読み込み（webQueue の依頼を5分ごとに少しずつ）。Long List・Knowledge Base で共通に使う台帳の処理。
+ * robots.txt を守り、トップと会社概要などを5ページまで。HP が台帳になければ AI の Web 検索で探す。
+ * 正式な会社名・所在地・従業員数・資本金・売上高を出どころのページ付きで companies.web に、読んだページを companyWeb に。
+ */
+export const companyWebSweep = onSchedule(
+  { ...common, schedule: 'every 5 minutes', timeoutSeconds: 300, memory: '512MiB', secrets: [anthropicKey] },
+  async () => {
+    await webSweep({ db, client: claude, log: (msg, data) => logger.info(msg, data) });
   },
 );

@@ -41,6 +41,15 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // 会社 HP の読み込み：依頼口（Long List・Knowledge Base の画面が会社IDで依頼する。処理は台帳の関数）と、読んだページ
+    match /webQueue/{id} {
+      allow read, create, update: if isOwner();
+      allow delete: if false;
+    }
+    match /companyWeb/{id} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
 
     // 「読む」にした記事の AI の下書き（Cloud Functions が書く）と、利用者のメモ
     match /drafts/{id} {

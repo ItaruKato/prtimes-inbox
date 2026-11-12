@@ -28,6 +28,7 @@
 - [x] Watcher の判定の対象を 2026-09-01 からに（はじめ 10-01、のちに 09-01 へ広げた）（backfill。画面は直近7日分を先に出し、古い分はあとから読み足す）
 - [x] ②台帳の準備：記事ページの「企業情報」（URL・業種・本社所在地・電話番号・代表者名・上場・資本金・設立）を companies に。過去1年分（2025-11-01〜）の記事を会社ごとに companyArticles へ
 - [x] gBizINFO：会社名と所在地（都道府県）で検索し、1社に決まったら法人番号・代表者・資本金・従業員数・設立・事業内容を companies に（gbiz・corporateNumber・gbizMatch）
+- [x] 会社 HP の読み込み（webQueue の依頼 → robots.txt を守って会社概要などを読み、正式な会社名・所在地・従業員数・資本金・売上高を出どころ付きで companies.web に、ページ本文を companyWeb に。HP がなければ AI の Web 検索）
 - [ ] 法人番号API（国税庁）：申請済み・アプリケーションIDの到着待ち（1か月ほど）。gBizINFO で決まらなかった会社の名寄せに使う
 - [ ] ③Long List
 - [ ] ④Knowledge Base（ItaruKato/knowledge、https://prtimes-knowledge.web.app）：ひな形・自動デプロイ・`kb` のルールまで。計画と決まったことは knowledge の `docs/plan.md`
@@ -41,6 +42,8 @@
 | `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous）、gbizAt、gbizInsured（厚生年金の被保険者数：total・offices・updated）、gbizFinance（有価証券報告書の主要な経営指標：year・period・sales・ordinaryIncome・netIncome・netAssets・totalAssets・capital は { raw, unit, yen }、employees）、gbizExtraAt | Cloud Functions |
 | `companyArticles/{会社ID}` | name、a.{記事ID} = { t: タイトル, p: 配信日時 } | Cloud Functions |
 | `profileQueue/{会社ID}` | 企業情報の読み込み待ち | Cloud Functions |
+| `webQueue/{会社ID}` | 会社 HP の読み込みの依頼口（at・by・redo）。Long List・Knowledge Base の画面や関数が会社IDで書く（create / update だけ）。処理したら台帳の関数が消す | 画面・Long List / Knowledge Base の関数（依頼）・Cloud Functions（処理） |
+| `companyWeb/{会社ID}` | 会社 HP から読んだページ（url・pages[{url, title, text}]・at）。売上・決算公告などをあとで拾い直すときに使う（HP を読み直さない） | Cloud Functions |
 | `jobs/{自動ID}` | 画面からの依頼（draft・handoff・transcribe）。1分ごとに処理し、1日で消す。画面から関数を直接呼ばない（外から呼べる入口を作らない）ため | 画面（依頼）・Cloud Functions（結果） |
 | `longlistIndex/{番号}`・`longlistMeta/{doc}` | Long List の一覧用のまとめ（台帳から6時間ごとに作る。`rows` は1行1社の JSON 文字列）と処理の状態（ItaruKato/longlist） | Long List の Cloud Functions |
 | `longlist/{会社ID}` | Long List の温度感・進捗・メモ・次にやること・担当、除外の手直し | Long List の画面 |
@@ -56,6 +59,7 @@
 | gBizINFO（`companies.gbiz`） | 法人番号・正式名・フリガナ・所在地・代表者・資本金・従業員数・設立日・創業年・HP・事業概要・事業項目・閉鎖日 | 最初の120社で約75%（1社に決まらない 5%・見つからない 20%） |
 | gBizINFO の事業所情報（`companies.gbizInsured`） | 厚生年金・健康保険の被保険者数（日本年金機構の適用事業所検索システムを gBizINFO が半年ごとに取り込んだもの。全喪していない事業所の合計）。従業員数とは違う（短時間のパートは入らず、役員は入る） | 法人番号が決まった会社のうち、厚生年金の適用事業所。180日ごとに読み直す |
 | gBizINFO の財務情報（`companies.gbizFinance`） | 売上高・経常利益・当期純利益・純資産・総資産・資本金・従業員数（EDINET の有価証券報告書。最新の回） | 有価証券報告書を出す会社（上場企業と一部の大きな会社）だけ |
+| 会社 HP（`companies.web`・`webAt`、ページ本文は `companyWeb`） | 正式な会社名・所在地・従業員数・資本金・売上高（それぞれ value・asOf（時点・決算期）・source（見つけたページの URL）。見つからなければ null）、HP の URL と見つけ方（urlFrom：profile / gbiz / search）、state（done / nosite / blocked / failed） | 依頼された会社だけ（Knowledge Base が読んだ会社と、会社ページのボタン）。180日ごとに読み直す |
 | 会社ごとの記事（`companyArticles`） | 2025-11-01 以降の全記事のタイトル・配信日時（本文は `buckets` の記事、2026-09-01 以降のみ） | 全社 |
 | AIの下書き（`drafts` / `handoff`） | 本人が「読む」にした記事の要点・営業トークの切り口・相性のよいサービス・業界（仮） | 「読む」にした記事だけ |
 
@@ -84,6 +88,7 @@
 
 ## Long List と Knowledge Base の分担（2026-11-12 本人が決定。二重に作らない）
 - **業界タグ（営業向け独自分類 30〜50種）**：分類表とタグを付ける処理は台帳側（このリポジトリの functions）に1つだけ置き、`companies/{会社ID}` に書く。Long List・Knowledge Base は読むだけ。**作るのは Long List のチャット**（Watcher・台帳の処理を足すので、作る前に本人に中身を相談する）。Knowledge Base はそれまで AI の仮の業界（`drafts.industry` など）を使い、できたら切り替える。
+- **会社 HP の読み込み（共通）**：台帳側の `companyWebSweep`（functions/src/web.ts、5分ごと）。作ったのは Knowledge Base のチャット（2026-11-12 本人が決定）。依頼は `webQueue/{会社ID}`。robots.txt を守り、トップと会社概要などを5ページまで1.5秒あけて読む。HP が台帳（PR TIMES の企業情報・gBizINFO）になければ AI の Web 検索で探し、会社名がページにあるときだけ使う。AI が正式な会社名・所在地・従業員数・資本金・売上高を出どころのページ付きで `companies.web` に書き、読んだページを `companyWeb` に残す。**Long List は HP を自分で読みに行かず、依頼は webQueue に書き、ページ本文は companyWeb を使う**（段階4の決算公告・売上もここから拾う。足りないページがあれば web.ts の読み方を直す）。
 - **売上・決算公告（会社 HP・記事から AI で拾う）**：業界タグと同じく台帳側の処理として `companies` に書く（出どころの URL と年度付き）。作るのは Long List のチャット（2026-11-12 本人が決定）。まず200社で試してから全社に広げる。官報は規約で機械的な収集が禁止なので読まない。
 - **会社ページ**：Knowledge Base が持つ。住所は `https://prtimes-knowledge.web.app/c/{会社ID}`（会社IDは PR TIMES の会社ID＝companies のドキュメントID）。Long List は自分の会社ページを作らず、このリンクで飛ぶ。Knowledge Base の会社ページは `longlist/{会社ID}` の `temperature`（A/B/C）と `progress`（未着手／アプローチ中／商談／受注／対象外）を読んで表示する（読むだけ）。Long List でこの名前を変えるときは、ここも直す。`longlist` のルールが入るまでは表示しない。
 - **コレクション名**：Knowledge Base は `kb` で始まる名前、Long List は `longlist` で始まる名前だけに書く。
