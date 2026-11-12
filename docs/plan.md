@@ -38,7 +38,7 @@
 | `handoff/{記事ID}` | 読了にした記事の受け渡し：`v`（形式の版=1）、`article`（タイトル・会社・URL・配信日時・本文冒頭）、`readAt`、`memo`、`myTags`、`stars`（0〜3）、`draft`（AIの要点：summary・points・angles・fits・memo・industry）、`updatedAt` | Cloud Functions |
 | `drafts/{記事ID}` | AIの下書き（state: working / done / failed） | Cloud Functions |
 | `notes/{記事ID}` | 自分のメモ（memo・myTags・stars） | 画面 |
-| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous）、gbizAt | Cloud Functions |
+| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous）、gbizAt、gbizInsured（厚生年金の被保険者数：total・offices・updated）、gbizFinance（有価証券報告書の主要な経営指標：year・period・sales・ordinaryIncome・netIncome・netAssets・totalAssets・capital は { raw, unit, yen }、employees）、gbizExtraAt | Cloud Functions |
 | `companyArticles/{会社ID}` | name、a.{記事ID} = { t: タイトル, p: 配信日時 } | Cloud Functions |
 | `profileQueue/{会社ID}` | 企業情報の読み込み待ち | Cloud Functions |
 | `jobs/{自動ID}` | 画面からの依頼（draft・handoff・transcribe）。1分ごとに処理し、1日で消す。画面から関数を直接呼ばない（外から呼べる入口を作らない）ため | 画面（依頼）・Cloud Functions（結果） |
@@ -52,12 +52,15 @@
 |---|---|---|
 | PR TIMES の記事ページ「企業情報」（`companies.profile`） | URL・業種（PR TIMES の大分類）・本社所在地・電話番号・代表者名・上場（未上場など）・資本金・設立 | 企業情報を読み終えた会社のほぼ全部（見つからない会社は3回まで読み直す） |
 | gBizINFO（`companies.gbiz`） | 法人番号・正式名・フリガナ・所在地・代表者・資本金・従業員数・設立日・創業年・HP・事業概要・事業項目・閉鎖日 | 最初の120社で約75%（1社に決まらない 5%・見つからない 20%） |
+| gBizINFO の事業所情報（`companies.gbizInsured`） | 厚生年金・健康保険の被保険者数（日本年金機構の適用事業所検索システムを gBizINFO が半年ごとに取り込んだもの。全喪していない事業所の合計）。従業員数とは違う（短時間のパートは入らず、役員は入る） | 法人番号が決まった会社のうち、厚生年金の適用事業所。180日ごとに読み直す |
+| gBizINFO の財務情報（`companies.gbizFinance`） | 売上高・経常利益・当期純利益・純資産・総資産・資本金・従業員数（EDINET の有価証券報告書。最新の回） | 有価証券報告書を出す会社（上場企業と一部の大きな会社）だけ |
 | 会社ごとの記事（`companyArticles`） | 2025-11-01 以降の全記事のタイトル・配信日時（本文は `buckets` の記事、2026-10-01 以降のみ） | 全社 |
 | AIの下書き（`drafts` / `handoff`） | 本人が「読む」にした記事の要点・営業トークの切り口・相性のよいサービス・業界（仮） | 「読む」にした記事だけ |
 
 - 名寄せ：gBizINFO は「名前（法人格を含む）が一致」→「法人格を除いた名前が一致」→ 同名が複数なら所在地（市区町村まで）で絞る。決まらなければ結びつけない（`gbizMatch` に none / ambiguous）。
 - 国税庁の法人番号API（届くのは 2026-12 中旬の見込み）で、none / ambiguous の会社を補う。取得元の表示が必要：「このサービスは、国税庁法人番号システムのWeb-API機能を利用して取得した情報をもとに作成しているが、サービスの内容は国税庁によって保証されたものではない」
-- gBizINFO の情報を画面に出すときも出典（gBizINFO・経済産業省）を表示する（利用規約は未確認。表示する前に確認する）。
+- gBizINFO の情報を画面に出すときは出典を表示する。利用規約（2026-11-12 確認。政府標準利用規約 2.0 準拠）：商用を含め自由に利用できる。出典の例「出典：「Gビズインフォ」（経済産業省）（ページのURL）」。編集・加工したときはその旨も書く（例「「Gビズインフォ」（経済産業省）をもとに作成」）。国が作ったように見せない。
+- 非上場の会社の売上・BS は、無料の公的なデータではほぼ取れない（gBizINFO の決算情報は官報掲載のうち公開を許諾した法人だけ）。有料のデータは Long List のチャットで比べて本人が決める。
 - 業界タグ（営業向け独自分類 30〜50種）は未作成。PR TIMES の業種・gBizINFO の事業概要・記事から AI で付ける予定（Long List の最初の仕事の候補）。
 
 ## Long List（③）で決まっていること

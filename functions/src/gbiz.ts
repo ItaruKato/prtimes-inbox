@@ -7,6 +7,7 @@ import type { CompanyProfile } from './company';
  * gBizINFO（経済産業省）で、台帳の会社を法人番号と結びつけ、代表者・資本金・従業員数などを足す。
  * PR TIMES の会社名と「企業情報」の所在地（都道府県）で検索し、名前が一致する法人が1つに決まったときだけ結びつける。
  * 書き込み先: companies/{会社ID} の corporateNumber・gbiz・gbizAt・gbizMatch
+ * 法人番号が決まった会社は、厚生年金の被保険者数（gbizInsured）と有価証券報告書の財務（gbizFinance）も読む（gbizExtraAt。180日ごとに読み直す）
  * API: https://api.info.gbiz.go.jp/hojin/v2/hojin（ヘッダー X-hojinInfo-api-token）
  */
 
@@ -126,6 +127,85 @@ export function toGbizInfo(h: Record<string, unknown>): GbizInfo {
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined)) as unknown as GbizInfo;
 }
 
+/** 金額（gBizINFO の値と単位のまま。単位が分かれば円に直した値も） */
+export interface Money {
+  raw: string;
+  unit?: string;
+  yen?: number;
+}
+
+/** 有価証券報告書（EDINET）の主要な経営指標。gBizINFO の財務情報の最新の回 */
+export interface GbizFinance {
+  year?: string;
+  period?: string;
+  sales?: Money;
+  ordinaryIncome?: Money;
+  netIncome?: Money;
+  netAssets?: Money;
+  totalAssets?: Money;
+  capital?: Money;
+  employees?: number;
+}
+
+/** 台帳に足す gBizINFO の追加の情報（厚生年金の加入者数と財務） */
+export interface GbizExtra {
+  /** 厚生年金・健康保険の被保険者数（日本年金機構の適用事業所。全喪していない事業所の合計） */
+  insured?: { total: number; offices: number; updated?: string };
+  finance?: GbizFinance;
+}
+
+const UNIT: [RegExp, number][] = [
+  [/百万/, 1e6],
+  [/千/, 1e3],
+  [/^(jpy|円)$/i, 1],
+];
+
+export function toMoney(v: unknown, unit: unknown): Money | undefined {
+  const raw = typeof v === 'number' ? String(v) : str(v, 40);
+  if (!raw || /^(n\/a|-|－)$/i.test(raw)) return undefined;
+  const u = str(unit, 20);
+  const out: Money = { raw, ...(u ? { unit: u } : {}) };
+  const n = Number(raw.normalize('NFKC').replace(/[,\s]/g, '').replace(/^△/, '-'));
+  const mul = u ? UNIT.find(([re]) => re.test(u))?.[1] : undefined;
+  if (Number.isFinite(n) && mul !== undefined) out.yen = n * mul;
+  return out;
+}
+
+const periodNo = (p: unknown) => Number(String(p ?? '').normalize('NFKC').match(/\d+/)?.[0] ?? NaN);
+
+export function toGbizExtra(corp: unknown, finance: unknown): GbizExtra {
+  const out: GbizExtra = {};
+  if (Array.isArray(corp)) {
+    const live = (corp as Record<string, unknown>[]).filter((c) => !str(c.loss_date));
+    const counts = live.map((c) => num(String(c.insured_number ?? '').normalize('NFKC').replace(/[,人\s]/g, ''))).filter((n): n is number => n !== undefined);
+    if (counts.length) {
+      const updated = live.map((c) => str((c['meta-data'] as Record<string, unknown> | undefined)?.last_update_date, 40)).find(Boolean);
+      out.insured = { total: counts.reduce((a, b) => a + b, 0), offices: counts.length, ...(updated ? { updated } : {}) };
+    }
+  }
+  const f = finance as Record<string, unknown> | undefined;
+  const idx = Array.isArray(f?.management_index) ? (f!.management_index as Record<string, unknown>[]) : [];
+  if (idx.length) {
+    // 最新の回（回次の数字が一番大きいもの。数字がなければ最後）
+    const latest = idx.reduce((a, b) => (periodNo(b.period) > periodNo(a.period) ? b : a), idx[idx.length - 1]);
+    const m = (k: string) => toMoney(latest[`${k}_summary_of_business_results`], latest[`${k}_summary_of_business_results_unit_ref`]);
+    const fin: GbizFinance = {
+      year: str(f!.fiscal_year_cover_page, 60),
+      period: str(latest.period, 40),
+      sales: m('net_sales') ?? m('operating_revenue1') ?? m('operating_revenue2') ?? m('gross_operating_revenue') ?? m('ordinary_income'),
+      ordinaryIncome: m('ordinary_income_loss'),
+      netIncome: m('net_income_loss'),
+      netAssets: m('net_assets'),
+      totalAssets: m('total_assets'),
+      capital: m('capital_stock'),
+      employees: num(String(latest.number_of_employees ?? '').normalize('NFKC').replace(/[,人\s]/g, '')),
+    };
+    const clean = Object.fromEntries(Object.entries(fin).filter(([, v]) => v !== undefined)) as GbizFinance;
+    if (Object.keys(clean).some((k) => k !== 'year' && k !== 'period')) out.finance = clean;
+  }
+  return out;
+}
+
 export type GbizGet = (url: string) => Promise<Record<string, unknown>>;
 
 export function gbizFetcher(token: string): GbizGet {
@@ -137,13 +217,33 @@ export function gbizFetcher(token: string): GbizGet {
   };
 }
 
+/**
+ * 法人番号が決まった会社の、厚生年金の加入者数と財務を読む。
+ * 詳細（/v2/hojin/{番号}）に入っていればそれを使い、入っていなければ /corporation・/finance を読む。
+ */
+export async function lookupExtra(
+  get: GbizGet,
+  sleep: (ms: number) => Promise<void>,
+  corporateNumber: string,
+  detail?: Record<string, unknown>,
+): Promise<GbizExtra> {
+  const child = async (path: 'corporation' | 'finance') => {
+    await sleep(INTERVAL_MS);
+    const r = await get(`${GBIZ_BASE}/${corporateNumber}/${path}`);
+    return ((r['hojin-infos'] as Record<string, unknown>[] | undefined) ?? [])[0] ?? {};
+  };
+  const corp = detail && 'corporation-info' in detail ? detail['corporation-info'] : (await child('corporation'))['corporation-info'];
+  const fin = detail && 'finance' in detail ? detail.finance : (await child('finance')).finance;
+  return toGbizExtra(corp, fin);
+}
+
 /** 1社を調べる。結びつけた法人番号（なければ null）と、調べ方 */
 export async function lookupCompany(
   get: GbizGet,
   sleep: (ms: number) => Promise<void>,
   company: string,
   profile: CompanyProfile | undefined,
-): Promise<{ info: GbizInfo | null; how: string }> {
+): Promise<{ info: GbizInfo | null; how: string; extra?: GbizExtra }> {
   const core = coreName(company);
   if (core.length < 2) return { info: null, how: 'none' };
   const pref = prefCode(profile?.address);
@@ -157,8 +257,19 @@ export async function lookupCompany(
   await sleep(INTERVAL_MS);
   const detail = await get(`${GBIZ_BASE}/${pick.c.corporate_number}`);
   const h = ((detail['hojin-infos'] as Record<string, unknown>[] | undefined) ?? [])[0];
-  return { info: toGbizInfo(h ?? (pick.c as Record<string, unknown>)), how: pick.how };
+  const info = toGbizInfo(h ?? (pick.c as Record<string, unknown>));
+  const extra = await lookupExtra(get, sleep, info.corporateNumber, h);
+  return { info, how: pick.how, extra };
 }
+
+/** 加入者数・財務を読み直すまでの日数（年金機構のデータは半年ごとに入れ替わる） */
+export const EXTRA_REFRESH_DAYS = 180;
+
+const extraFields = (extra: GbizExtra | undefined) => ({
+  gbizExtraAt: new Date().toISOString(),
+  ...(extra?.insured ? { gbizInsured: extra.insured } : {}),
+  ...(extra?.finance ? { gbizFinance: extra.finance } : {}),
+});
 
 const INTERVAL_MS = 1000;
 const PER_RUN = 120;
@@ -204,12 +315,27 @@ export async function gbizSweep(deps: {
         cursor = d.id;
         scanned++;
         const c = d.data();
-        if (c.gbizAt || !c.profileAt || !c.name) continue;
+        // 法人番号が決まった会社：加入者数・財務がまだ（または古い）なら読む
+        const extraDue =
+          Boolean(c.gbizAt && c.corporateNumber) &&
+          (!c.gbizExtraAt || Date.now() - new Date(String(c.gbizExtraAt)).getTime() > EXTRA_REFRESH_DAYS * 86400e3);
+        if (!extraDue && (c.gbizAt || !c.profileAt || !c.name)) continue;
         if (done > 0) await sleep(INTERVAL_MS);
         try {
-          const { info, how } = await lookupCompany(deps.get, sleep, String(c.name), c.profile as CompanyProfile | undefined);
+          if (extraDue) {
+            const extra = await lookupExtra(deps.get, sleep, String(c.corporateNumber));
+            await d.ref.set(extraFields(extra), { merge: true });
+            counts.extra = (counts.extra ?? 0) + 1;
+            done++;
+            continue;
+          }
+          const { info, how, extra } = await lookupCompany(deps.get, sleep, String(c.name), c.profile as CompanyProfile | undefined);
           await d.ref.set(
-            { gbizAt: new Date().toISOString(), gbizMatch: how, ...(info ? { corporateNumber: info.corporateNumber, gbiz: info } : {}) },
+            {
+              gbizAt: new Date().toISOString(),
+              gbizMatch: how,
+              ...(info ? { corporateNumber: info.corporateNumber, gbiz: info, ...extraFields(extra) } : {}),
+            },
             { merge: true },
           );
           counts[info ? 'matched' : how] = (counts[info ? 'matched' : how] ?? 0) + 1;
