@@ -357,7 +357,7 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
       return pages[c];
     };
     await db.doc('meta/archive').set({ from: ARCHIVE_FROM, day: '2025-11-02' });
-    await db.doc('companies/8').set({ name: '会社000000008', profile: { phone: '03' } });
+    await db.doc('companies/8').set({ name: '会社000000008', profile: { phone: '03' }, profileAt: '2026-11-01T00:00:00Z' });
     const r = await archivePast({ db, get, sleep: async () => {} });
     expect(r).toMatchObject({ done: true, pages: 3, items: 4 });
     const a7 = (await db.doc('companyArticles/7').get()).data()!;

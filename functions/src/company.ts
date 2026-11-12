@@ -161,9 +161,13 @@ export async function archiveOps(
   }
   const cids = [...by.keys()];
   const known = new Set<string>();
+  const hasProfile = new Set<string>();
   for (let i = 0; i < cids.length; i += 300) {
     const snaps = await db.getAll(...cids.slice(i, i + 300).map((c) => db.collection('companies').doc(c)));
-    for (const s of snaps) if (s.exists) known.add(s.id);
+    for (const s of snaps) {
+      if (s.exists) known.add(s.id);
+      if (s.get('profileAt')) hasProfile.add(s.id);
+    }
   }
   const units: Op[][] = [];
   for (const [cid, list] of by) {
@@ -178,7 +182,8 @@ export async function archiveOps(
     if (!known.has(cid) && name) {
       unit.push({ bytes: 200, apply: (b) => b.set(db.collection('companies').doc(cid), { name, updatedAt: new Date().toISOString() }, { merge: true }) });
     }
-    if (!known.has(cid) && name && !profiled.has(cid)) {
+    // 企業情報をまだ読んでいない会社は、読み込み待ちに並べる（前からある会社も、記事が出てきたときに並ぶ）
+    if (!hasProfile.has(cid) && !profiled.has(cid) && (known.has(cid) || name)) {
       unit.push({
         bytes: 300,
         apply: (b) => b.set(db.collection('profileQueue').doc(cid), { url: list[0].url, at: FieldValue.serverTimestamp() }, { merge: true }),

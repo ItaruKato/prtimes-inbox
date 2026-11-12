@@ -148,6 +148,20 @@ const jst = (ms, len) => {
   } catch (e) {
     log(`ログの取得に失敗: ${String(e).slice(0, 300)}`);
   }
+  // 台帳づくり・依頼の処理の直近の記録（警告以上と、各回の結果）
+  try {
+    const raw = execSync(
+      `gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name=("archivecompanies" OR "companyprofiles" OR "runjobseveryminute" OR "draftnotes") AND timestamp>="${new Date(now - 3 * 3600e3).toISOString()}" AND (severity>=WARNING OR jsonPayload.message=("archive run" OR "profile sweep" OR "jobs" OR "draft sweep"))' --project=prtimes-inbox --limit=30 --format=json`,
+      { encoding: 'utf8', maxBuffer: 20e6 },
+    );
+    const rows = JSON.parse(raw || '[]').map((e) => {
+      const msg = e.textPayload ?? JSON.stringify(e.jsonPayload ?? e.protoPayload?.status ?? {});
+      return `${e.timestamp} ${e.severity} ${e.resource?.labels?.service_name} ${String(msg).slice(0, 300)}`;
+    });
+    log(`台帳づくり・依頼の処理（直近3時間）:\n${rows.join('\n') || '（なし）'}`);
+  } catch (e) {
+    log(`ログの取得に失敗: ${String(e).slice(0, 300)}`);
+  }
 
   try {
     const res = await fetch('https://prtimes-inbox.web.app/');
