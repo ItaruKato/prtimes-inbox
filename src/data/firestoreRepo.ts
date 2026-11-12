@@ -37,6 +37,11 @@ interface SavedDoc {
 /** range: 読み込む期間（受信箱・不要など）。「読む」「読了」は saved から期間に関係なく読む */
 export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo {
   const byId = new Map<string, Item>();
+  /** 読み込まずにいる「不要」の記事の目次（振り分けの保存・戻すときに使う） */
+  const hiddenEntries = new Map<string, IndexEntry>();
+  /** 不要にした記事も読み込むか（「不要」を開いたとき・検索するとき・点検画面） */
+  let includeDropped = false;
+  let reemit: (() => void) | null = null;
   /** saved にドキュメントがある記事（無い記事に削除を送らないため） */
   const savedIds = new Set<string>();
 
@@ -46,8 +51,9 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
   return {
     subscribe(onData, onError) {
       const since = rangeStart(range);
-      /** 目次ドキュメントごとの記事（新しい順）。変わったドキュメントだけ作り直す */
-      const dayItems = new Map<string, Item[]>();
+      /** 目次ドキュメントごとの目次（新しい順）と、作った記事（変わったドキュメントだけ作り直す） */
+      const dayEntries = new Map<string, [string, IndexEntry][]>();
+      const dayItems = new Map<string, Map<string, Item>>();
       let dayDecisions = new Map<string, Record<string, Decision>>();
       let saved = new Map<string, SavedDoc>();
       const ready = { days: false, decisions: false, saved: false };
@@ -55,30 +61,47 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
       const emit = () => {
         if (!ready.days || !ready.decisions || !ready.saved) return;
         byId.clear();
-        // 目次ドキュメントのIDは時間順に並ぶので、新しいドキュメントから順に並べれば全体も新しい順になる
+        hiddenEntries.clear();
+        const decisions: Record<string, Decision> = {};
+        for (const [id, sd] of saved) decisions[id] = sd.decision;
+        for (const m of dayDecisions.values()) Object.assign(decisions, m);
+        // 目次ドキュメントのIDは時間順に並ぶので、新しいドキュメントから順に並べれば全体も新しい順になる。
+        // 「不要」にした記事は、必要になるまで記事を作らない（件数が増えても軽く動くように）
         const items: Item[] = [];
-        for (const k of [...dayItems.keys()].sort().reverse())
-          for (const it of dayItems.get(k)!) {
-            if (byId.has(it.id)) continue;
-            byId.set(it.id, it);
+        let hiddenDrops = 0;
+        for (const k of [...dayEntries.keys()].sort().reverse()) {
+          const made = dayItems.get(k) ?? new Map<string, Item>();
+          dayItems.set(k, made);
+          for (const [id, e] of dayEntries.get(k)!) {
+            if (byId.has(id) || hiddenEntries.has(id)) continue;
+            if (!includeDropped && decisions[id]?.status === 'drop') {
+              hiddenEntries.set(id, e);
+              hiddenDrops++;
+              continue;
+            }
+            let it = made.get(id);
+            if (!it) {
+              it = toItem(fromEntry(id, e));
+              made.set(id, it);
+            }
+            byId.set(id, it);
             items.push(it);
           }
-        const decisions: Record<string, Decision> = {};
+        }
         let extra = false;
-        for (const [id, s] of saved) {
+        for (const [id, sd] of saved) {
           if (!byId.has(id)) {
-            const it = toItem(s.article);
+            const it = toItem(sd.article);
             byId.set(id, it);
             items.push(it);
             extra = true;
           }
-          decisions[id] = s.decision;
         }
-        for (const m of dayDecisions.values()) Object.assign(decisions, m);
         if (extra) items.sort((x, y) => y.ts - x.ts);
-        onData({ items, decisions });
+        onData({ items, decisions, hiddenDrops });
       };
       const fail = (e: Error) => onError(e);
+      reemit = emit;
       let older: ReturnType<typeof setTimeout> | undefined;
 
       /** 目次の購読（変わったドキュメントだけ作り直す）。first: 最初の結果が届いたら呼ぶ */
@@ -95,14 +118,14 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
             // 中身が変わっていない通知（キャッシュ→サーバーの確認だけ）は、作り直さない
             if (!changes.length && got) return;
             for (const c of changes) {
+              dayItems.delete(c.doc.id);
               if (c.type === 'removed') {
-                dayItems.delete(c.doc.id);
+                dayEntries.delete(c.doc.id);
                 continue;
               }
-              const entries = (c.doc.data().items ?? {}) as Record<string, IndexEntry>;
-              const list = Object.entries(entries).map(([id, e]) => toItem(fromEntry(id, e)));
-              list.sort((x, y) => y.ts - x.ts);
-              dayItems.set(c.doc.id, list);
+              const entries = Object.entries((c.doc.data().items ?? {}) as Record<string, IndexEntry>);
+              entries.sort((x, y) => (x[1].p < y[1].p ? 1 : x[1].p > y[1].p ? -1 : 0));
+              dayEntries.set(c.doc.id, entries);
             }
             if (!got) {
               got = true;
@@ -155,6 +178,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         ),
       ];
       return () => {
+        reemit = null;
         clearTimeout(older);
         unsubs.forEach((u) => u());
       };
@@ -234,12 +258,19 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
       await setDoc(doc(db, 'config', 'exclusion'), c, { merge: true });
     },
 
+    setIncludeDropped(on) {
+      if (includeDropped === on) return;
+      includeDropped = on;
+      reemit?.();
+    },
+
     async saveDecisions(changes) {
       // decisions/{記事の配信日} にまとめて書く。「読む」「読了」は記事ごと saved にも残す（無期限）
       const ops: ((b: WriteBatch) => void)[] = [];
       const perDay = new Map<string, Record<string, Decision | ReturnType<typeof deleteField>>>();
       for (const [id, d] of Object.entries(changes)) {
-        const it = byId.get(id);
+        const hidden = hiddenEntries.get(id);
+        const it = byId.get(id) ?? (hidden ? toItem(fromEntry(id, hidden)) : undefined);
         if (!it) continue;
         const day = jstKey(it.ts, 8);
         const m = perDay.get(day) ?? {};

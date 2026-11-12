@@ -74,12 +74,18 @@ export function useTriage(repo: Repo) {
   /** 表示中の画面（振り分け／ルールの点検） */
   // 起動時は「判定」から始める
   const [page, setPage] = useState<'triage' | 'review' | 'judge'>('judge');
+  /** 読み込んでいない「不要」の記事の数（件数の表示に足す） */
+  const [hiddenDrops, setHiddenDrops] = useState(0);
+  // 「不要」にした記事は、不要の一覧・検索・点検のときだけ読み込む
+  const needDropped = page === 'review' || (page === 'triage' && view === 'drop') || q.trim() !== '';
+  useEffect(() => repo.setIncludeDropped?.(needDropped), [repo, needDropped]);
   useEffect(() => {
     setLoading(true);
     return repo.subscribe(
-      ({ items: its, decisions }) => {
+      ({ items: its, decisions, hiddenDrops: hd }) => {
         setItems(its);
         setDec(decisions);
+        setHiddenDrops(hd ?? 0);
         setLoading(false);
         setError(null);
       },
@@ -90,7 +96,13 @@ export function useTriage(repo: Repo) {
     );
   }, [repo]);
 
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // この画面で「不要」にした記事は、一覧から消えても詳細（理由を書く）や戻すときに使えるよう覚えておく
+  const sticky = useRef(new Map<string, Item>());
+  const byId = useMemo(() => {
+    const m = new Map(items.map((i) => [i.id, i]));
+    for (const [id, it] of sticky.current) if (!m.has(id)) m.set(id, it);
+    return m;
+  }, [items]);
   const statusOf = useCallback((it: Item) => dec[it.id]?.status ?? defaultStatus(it, disabled), [dec, disabled]);
 
   // 件数集計と表示対象を1回の走査で作る（3,000件/日×数日でも軽く）
@@ -113,6 +125,12 @@ export function useTriage(repo: Repo) {
     return { counts, tagCounts, visible };
   }, [items, statusOf, view, q, tag]);
 
+  // 件数（読み込んでいない「不要」の記事も数える）
+  const counts = useMemo(
+    () => (hiddenDrops ? { ...derived.counts, drop: derived.counts.drop + hiddenDrops } : derived.counts),
+    [derived.counts, hiddenDrops],
+  );
+
   // 次に開いたときすぐ出せるよう、受信箱の先頭と件数を端末に保存する（少し待ってから）
   useEffect(() => {
     if (loading || !items.length) return;
@@ -124,13 +142,13 @@ export function useTriage(repo: Repo) {
         rows.push({ id: it.id, t: it.title, c: it.company, ts: it.ts, g: it.judge.tags });
       }
       try {
-        localStorage.setItem(PREVIEW_KEY, JSON.stringify({ savedAt: Date.now(), rows, counts: derived.counts }));
+        localStorage.setItem(PREVIEW_KEY, JSON.stringify({ savedAt: Date.now(), rows, counts }));
       } catch {
         /* 保存できなくても動く */
       }
     }, 1500);
     return () => clearTimeout(id);
-  }, [loading, items, dec, disabled, derived.counts]);
+  }, [loading, items, dec, disabled, counts]);
 
   const learning = useMemo(() => {
     let manualDrop = 0;
@@ -206,6 +224,7 @@ export function useTriage(repo: Repo) {
     (id: string, status: Status, opts: { reasonTags?: string[]; quiet?: boolean } = {}): (() => void) | undefined => {
       const it = byId.get(id);
       if (!it) return undefined;
+      if (status === 'drop') sticky.current.set(id, it);
       // AIの初期判定と同じ場所に戻す場合は記録を消す
       const prev = dec[it.id];
       const change: Decision | null =
@@ -328,7 +347,7 @@ export function useTriage(repo: Repo) {
     setSel,
     ...derived,
     // 読み込み中は、前回保存した件数を出す（0件が並ばないように）
-    counts: loading && preview ? preview.counts : derived.counts,
+    counts: loading && preview ? preview.counts : counts,
     preview: loading ? preview : null,
     learning,
     setStatus,
