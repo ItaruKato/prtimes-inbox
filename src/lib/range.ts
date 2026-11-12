@@ -5,7 +5,7 @@ export const RANGES: { k: RangeKey; label: string }[] = [
   { k: '3', label: '直近3日' },
   { k: '7', label: '直近7日' },
   { k: '10', label: '直近10日' },
-  { k: 'all', label: '10/1から' },
+  { k: 'all', label: '9/1から' },
 ];
 
 export const rangeLabel = (k: RangeKey) => RANGES.find((r) => r.k === k)!.label;
@@ -13,7 +13,7 @@ export const rangeLabel = (k: RangeKey) => RANGES.find((r) => r.k === k)!.label;
 // 判定の対象を10月1日からに広げたときに既定値を「全期間」に変えたので、記憶する場所も新しくした
 const LS_KEY = 'prt-range-v2';
 
-/** 前回選んだ期間（端末に記憶）。読めなければ全期間（10月1日から） */
+/** 前回選んだ期間（端末に記憶）。読めなければ全期間（9月1日から） */
 export function loadRange(): RangeKey {
   try {
     const v = localStorage.getItem(LS_KEY);

@@ -113,7 +113,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
           fail,
         );
       };
-      // 全期間は記事が多い（10月1日から約8万件）。先に直近7日分を読んで画面を出し、古い分は少し待ってから読み足す
+      // 全期間は記事が多い（9月1日から約11万件）。先に直近7日分を読んで画面を出し、古い分は少し待ってから読み足す
       // （同時に読むと、端末内の保存場所の読み込みが重なって最初の表示が遅れる）
       const recentKey = jstKey((since ?? Date.now() - 7 * 86400e3), 8);
       const unsubs = [

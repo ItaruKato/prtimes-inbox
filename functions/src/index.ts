@@ -55,7 +55,7 @@ export const enrichHourly = onSchedule(
   },
 );
 
-/** 10月1日以降の記事をさかのぼって取り込む（10分ごとに少しずつ。終わったら何もしない） */
+/** 9月1日以降の記事をさかのぼって取り込む（10分ごとに少しずつ。終わったら何もしない） */
 export const backfillPast = onSchedule(
   { ...common, schedule: 'every 10 minutes', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
