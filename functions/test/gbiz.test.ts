@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coreName, GBIZ_BASE, lookupExtra, normName, pickCandidate, prefCode, toGbizExtra, toGbizInfo, toMoney } from '../src/gbiz';
+import { coreName, GBIZ_BASE, gbizKind, GbizHttpError, isBadRequest, lookupExtra, normName, pickCandidate, prefCode, toGbizExtra, toGbizInfo, toMoney } from '../src/gbiz';
 
 describe('gbiz', () => {
   it('名前をそろえる', () => {
@@ -106,5 +106,30 @@ describe('gbiz', () => {
       insured: { total: 3, offices: 1 },
     });
     expect(urls).toEqual([]);
+  });
+
+  it('エラーの種類：どの問い合わせか、やり直しても同じ 400 か', () => {
+    expect(gbizKind(`${GBIZ_BASE}?name=A&limit=50`)).toBe('search');
+    expect(gbizKind(`${GBIZ_BASE}/1234567890123`)).toBe('detail');
+    expect(gbizKind(`${GBIZ_BASE}/1234567890123/corporation`)).toBe('corporation');
+    expect(gbizKind(`${GBIZ_BASE}/1234567890123/finance`)).toBe('finance');
+    expect(new GbizHttpError(400, 'search').message).toBe('gBizINFO 400 (search)');
+    expect(isBadRequest(new GbizHttpError(400, 'detail'))).toBe(true);
+    expect(isBadRequest(new GbizHttpError(429, 'detail'))).toBe(false);
+    expect(isBadRequest(new Error('gBizINFO 429'))).toBe(false);
+    expect(isBadRequest(new Error('fetch failed'))).toBe(false);
+  });
+
+  it('加入者数・財務の問い合わせが 400 なら、その分は無い扱いにして続ける（ほかのエラーはやり直す）', async () => {
+    const sleep = async () => {};
+    const get400 = async (url: string) => {
+      if (url.endsWith('/corporation')) throw new GbizHttpError(400, 'corporation');
+      return { 'hojin-infos': [{ finance: { management_index: [{ period: '第1期', net_sales_summary_of_business_results: '10', net_sales_summary_of_business_results_unit_ref: '百万円' }] } }] };
+    };
+    expect(await lookupExtra(get400, sleep, '1234567890123', { name: 'A' })).toEqual({ finance: { period: '第1期', sales: { raw: '10', unit: '百万円', yen: 10e6 } } });
+    const get429 = async () => {
+      throw new GbizHttpError(429, 'corporation');
+    };
+    await expect(lookupExtra(get429, sleep, '1234567890123', { name: 'A' })).rejects.toThrow('gBizINFO 429');
   });
 });

@@ -39,7 +39,7 @@
 | `handoff/{記事ID}` | 読了にした記事の受け渡し：`v`（形式の版=1）、`article`（タイトル・会社・URL・配信日時・本文冒頭）、`readAt`、`memo`、`myTags`、`stars`（0〜3）、`draft`（AIの要点：summary・points・angles・fits・memo・industry）、`updatedAt` | Cloud Functions |
 | `drafts/{記事ID}` | AIの下書き（state: working / done / failed） | Cloud Functions |
 | `notes/{記事ID}` | 自分のメモ（memo・myTags・stars） | 画面 |
-| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous）、gbizAt、gbizInsured（厚生年金の被保険者数：total・offices・updated）、gbizFinance（有価証券報告書の主要な経営指標：year・period・sales・ordinaryIncome・netIncome・netAssets・totalAssets・capital は { raw, unit, yen }、employees）、gbizExtraAt | Cloud Functions |
+| `companies/{会社ID}` | name、profile（url・industry・address・phone・representative・listed・capital・established）、profileAt、corporateNumber、gbiz（gBizINFO：representative・capital・employees・established・url・summary など）、gbizMatch（name / core / name+address / none / ambiguous / error＝gBizINFO が 400 で受け付けなかった。gbizError に問い合わせの種類）、gbizAt、gbizInsured（厚生年金の被保険者数：total・offices・updated）、gbizFinance（有価証券報告書の主要な経営指標：year・period・sales・ordinaryIncome・netIncome・netAssets・totalAssets・capital は { raw, unit, yen }、employees）、gbizExtraAt | Cloud Functions |
 | `companyArticles/{会社ID}` | name、a.{記事ID} = { t: タイトル, p: 配信日時 } | Cloud Functions |
 | `profileQueue/{会社ID}` | 企業情報の読み込み待ち | Cloud Functions |
 | `webQueue/{会社ID}` | 会社 HP の読み込みの依頼口（at・by・redo・manual）。**人が画面で指示したときだけ**書く（manual: true。費用対効果のため、自動の依頼はしない。manual がない依頼は読まずに消す）。create / update だけ。処理したら台帳の関数が消す | 画面・Long List / Knowledge Base の関数（依頼）・Cloud Functions（処理） |

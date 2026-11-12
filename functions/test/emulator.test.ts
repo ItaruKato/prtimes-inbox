@@ -16,7 +16,7 @@ import { archivePast, profileSweep } from '../src/company';
 
 const ARCHIVE_FROM = '2025-11-01T00:00:00+09:00';
 import { runJobs } from '../src/jobs';
-import { gbizSweep } from '../src/gbiz';
+import { GbizHttpError, gbizSweep } from '../src/gbiz';
 import { BUCKET_MAX_BYTES, BUCKET_MAX_INDEX, BUCKET_TARGET_BYTES, docSize, indexEntries, LEAD_MAX } from '../src/buckets';
 import type { RawItem } from '../src/parse';
 import type { Article } from '../src/types';
@@ -494,6 +494,22 @@ describe.skipIf(!HOST)('Firestore エミュレーター', () => {
     expect((await db.doc('companies/5').get()).data()!.gbizAt).toBeUndefined();
     const r3 = await gbizSweep({ db, get: async () => ({ 'hojin-infos': [] }), sleep: async () => {} });
     expect(r3).toMatchObject({ none: 1 });
+    // 400（受け付けられない問い合わせ）は、印を付けて次の会社へ進む（止まらない）
+    await db.doc('companies/6').set({ name: '株式会社だめ', profileAt: 'x', profile: { address: '東京都' } });
+    await db.doc('companies/7').set({ name: '株式会社つぎ', profileAt: 'x', profile: { address: '東京都' } });
+    await db.doc('meta/gbiz').set({ cursor: '5' });
+    const r4 = await gbizSweep({
+      db,
+      get: async (url) => {
+        if (url.includes(encodeURIComponent('だめ'))) throw new GbizHttpError(400, 'search');
+        return { 'hojin-infos': [] };
+      },
+      sleep: async () => {},
+    });
+    expect(r4).toMatchObject({ bad_search: 1, none: 1 });
+    expect(r4).not.toHaveProperty('error');
+    expect((await db.doc('companies/6').get()).data()).toMatchObject({ gbizMatch: 'error', gbizError: '400 search' });
+    expect((await db.doc('companies/7').get()).data()).toMatchObject({ gbizMatch: 'none' });
   }, 60_000);
 
   it('cleanup は30日より前の時間バケット（続きのドキュメントも）と振り分けだけを消す', async () => {

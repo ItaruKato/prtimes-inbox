@@ -208,11 +208,32 @@ export function toGbizExtra(corp: unknown, finance: unknown): GbizExtra {
 
 export type GbizGet = (url: string) => Promise<Record<string, unknown>>;
 
+/** どの問い合わせか（エラーの記録に使う。会社名やトークンは入れない） */
+export function gbizKind(url: string): 'search' | 'detail' | 'corporation' | 'finance' {
+  if (url.includes('?')) return 'search';
+  if (/\/corporation$/.test(url)) return 'corporation';
+  if (/\/finance$/.test(url)) return 'finance';
+  return 'detail';
+}
+
+/** gBizINFO の HTTP エラー（状態の番号と、どの問い合わせか） */
+export class GbizHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly kind: string,
+  ) {
+    super(`gBizINFO ${status} (${kind})`);
+  }
+}
+
+/** 400（受け付けられない問い合わせ）：会社ごとに決まっていて、やり直しても同じ */
+export const isBadRequest = (e: unknown) => (e instanceof GbizHttpError ? e.status === 400 : /gBizINFO 400\b/.test(String(e)));
+
 export function gbizFetcher(token: string): GbizGet {
   return async (url) => {
     const res = await fetch(url, { headers: { 'X-hojinInfo-api-token': token, Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) });
     if (res.status === 404) return {};
-    if (!res.ok) throw new Error(`gBizINFO ${res.status}`);
+    if (!res.ok) throw new GbizHttpError(res.status, gbizKind(url));
     return (await res.json()) as Record<string, unknown>;
   };
 }
@@ -229,8 +250,14 @@ export async function lookupExtra(
 ): Promise<GbizExtra> {
   const child = async (path: 'corporation' | 'finance') => {
     await sleep(INTERVAL_MS);
-    const r = await get(`${GBIZ_BASE}/${corporateNumber}/${path}`);
-    return ((r['hojin-infos'] as Record<string, unknown>[] | undefined) ?? [])[0] ?? {};
+    try {
+      const r = await get(`${GBIZ_BASE}/${corporateNumber}/${path}`);
+      return ((r['hojin-infos'] as Record<string, unknown>[] | undefined) ?? [])[0] ?? {};
+    } catch (e) {
+      // 400 はその会社の情報がない扱い（やり直しても同じ）。ほかのエラーは次の回にやり直す
+      if (isBadRequest(e)) return {};
+      throw e;
+    }
   };
   const corp = detail && 'corporation-info' in detail ? detail['corporation-info'] : (await child('corporation'))['corporation-info'];
   const fin = detail && 'finance' in detail ? detail.finance : (await child('finance')).finance;
@@ -341,6 +368,15 @@ export async function gbizSweep(deps: {
           counts[info ? 'matched' : how] = (counts[info ? 'matched' : how] ?? 0) + 1;
           done++;
         } catch (e) {
+          if (isBadRequest(e)) {
+            // 受け付けられない問い合わせ（会社ごとに決まっていて、やり直しても同じ）：印を付けて次の会社へ
+            const kind = e instanceof GbizHttpError ? e.kind : 'unknown';
+            const at = new Date().toISOString();
+            await d.ref.set(extraDue ? { gbizExtraAt: at, gbizExtraError: `400 ${kind}` } : { gbizAt: at, gbizMatch: 'error', gbizError: `400 ${kind}` }, { merge: true });
+            counts[`bad_${kind}`] = (counts[`bad_${kind}`] ?? 0) + 1;
+            done++;
+            continue;
+          }
           // 利用上限・一時的な不具合：ここで止めて、次の回に同じ会社から続ける
           error = String(e).slice(0, 200);
           cursor = before;
