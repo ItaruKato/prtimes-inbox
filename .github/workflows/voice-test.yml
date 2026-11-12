@@ -1,0 +1,28 @@
+name: voice-test
+
+# 音声メモの文字起こしを呼べるかの確認（1秒の無音で依頼を1件出し、処理されるまで待つ）
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: functions
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/723210521199/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-deploy@prtimes-inbox.iam.gserviceaccount.com
+      - name: 文字起こしの確認
+        run: node scripts/voice-test.cjs
