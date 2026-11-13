@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildModel } from '../lib/learn';
 import type { AiStatus, Decision, ExclusionConfig, Item, RuleReport, Status, TagKey } from '../types';
 import { EXCLUSION_RULES } from '../lib/exclusion';
 import type { Repo } from '../data/repo';
@@ -107,6 +108,8 @@ export function useTriage(repo: Repo) {
 
   // この画面で「不要」にした記事は、一覧から消えても詳細（理由を書く）や戻すときに使えるよう覚えておく
   const sticky = useRef(new Map<string, Item>());
+  // これまでの判定から、読む・不要によく出る言葉を学ぶ（端末の中だけ。判定が変わるたびに数え直す）
+  const learned = useMemo(() => buildModel(Object.values(dec)), [dec]);
   const byId = useMemo(() => {
     const m = new Map(items.map((i) => [i.id, i]));
     for (const [id, it] of sticky.current) if (!m.has(id)) m.set(id, it);
@@ -330,6 +333,8 @@ export function useTriage(repo: Repo) {
     /** ユーザーが振り分けた記事か（AIの初期判定のままなら false） */
     decided: (id: string) => id in dec,
     decisionOf: (id: string) => dec[id],
+    /** これまでの判定から学んだ言葉と会社（判定カードの強調に使う） */
+    learned,
     /** 記事の全データを読む（一覧は目次だけなので、詳細を開いたときに使う） */
     loadArticle: repo.loadArticle ? (it: Item) => repo.loadArticle!(it.id, it.publishedAt) : undefined,
     disabledRules: disabled,

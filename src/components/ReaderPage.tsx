@@ -176,10 +176,11 @@ export function ReaderPage({ t }: { t: Triage }) {
             {!t.loading && (skipped.size ? `あとでにした ${num(skipped.size)}件は、開き直すと出てきます。` : '判定で「読む」にした記事がここに来ます。')}
           </div>
         )}
-        {next && <Card key={next.id} it={next} full={full[next.id]} behind />}
+        {next && <Card key={next.id} it={next} full={full[next.id]} behind model={t.learned} />}
         {cur && (
           <Card
             key={cur.id}
+            model={t.learned}
             it={cur}
             full={full[cur.id]}
             leaving={leaving}

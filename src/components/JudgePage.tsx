@@ -9,6 +9,7 @@ import { NotifyBox } from './NotifyBox';
 import { RANGES, type RangeKey } from '../lib/range';
 import { relatedItems } from '../lib/sameEvent';
 import { CompanyFactsView } from './CompanyFactsView';
+import { highlight, leaning, type LearnModel } from '../lib/learn';
 
 const LS_ORDER = 'prt-judge-order';
 const SWIPE = 70; // これ以上ずらしたら判定する（px）
@@ -182,10 +183,11 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
             {!t.loading && (skipped.size ? `スキップした ${num(skipped.size)}件は、開き直すと出てきます。` : '新着は30分ごとに届きます。')}
           </div>
         )}
-        {next && <Card key={next.id} it={next} full={full[next.id]} behind />}
+        {next && <Card key={next.id} it={next} full={full[next.id]} behind model={t.learned} />}
         {cur && (
           <Card
             key={cur.id}
+            model={t.learned}
             it={cur}
             full={full[cur.id]}
             leaving={leaving}
@@ -247,7 +249,7 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
         </button>
       </div>
       <p className="judgehint muted small">
-        右にスワイプで「読む」、左にスワイプで「不要」（軽くはじくだけでも判定します）。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
+        右にスワイプで「読む」、左にスワイプで「不要」（軽くはじくだけでも判定します）。太字は金額・ラウンド・上場などの重要語、緑はあなたが読む記事によく出る言葉、灰色は不要にする記事によく出る言葉です。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
       </p>
     </section>
   );
@@ -262,6 +264,7 @@ export function Card({
   onSwipe,
   stamps = { keep: '読む', drop: '不要' },
   extra,
+  model = null,
 }: {
   it: Item;
   full: Article | null | undefined;
@@ -272,6 +275,8 @@ export function Card({
   stamps?: { keep: string; drop: string };
   /** 本文の冒頭の前に出すもの（読む画面の AI の要点など） */
   extra?: React.ReactNode;
+  /** これまでの判定から学んだ言葉（強調に使う） */
+  model?: LearnModel | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; dx: number; id: number; lock: 'x' | 'y' | null; t: number; v: number } | null>(null);
@@ -370,15 +375,55 @@ export function Card({
         {it.ticker && <span className="tick">{it.ticker}</span>}
         <span className="muted small">{fullDate(it.ts)}</span>
       </div>
-      <h2 className="cardtitle">{it.title}</h2>
-      <div className="cardcompany">{it.company}</div>
+      <h2 className="cardtitle">
+        <Marked text={it.title} model={model} />
+      </h2>
+      <div className="cardcompany">
+        {it.company}
+        {!behind && <CompanyHistory company={it.company} title={it.title} model={model} />}
+      </div>
       {!behind && <CompanyFactsView articleId={it.id} compact />}
       {!behind && extra}
       {summary && !extra && <p className="cardsummary">{summary}</p>}
-      <div className="cardlead">{full === undefined ? '本文を読み込み中…' : lead || '本文の冒頭はありません。'}</div>
+      <div className="cardlead">
+        {full === undefined ? '本文を読み込み中…' : lead ? <Marked text={lead} model={behind ? null : model} /> : '本文の冒頭はありません。'}
+      </div>
       <a className="btn cardopen" href={it.url} target="_blank" rel="noopener noreferrer">
         PR TIMESで開く ↗
       </a>
     </div>
+  );
+}
+
+/** 強調した文（太字：金額・ラウンドなどの重要語、緑：読む寄りの言葉、灰：不要寄りの言葉） */
+export function Marked({ text, model }: { text: string; model: LearnModel | null }) {
+  const spans = useMemo(() => highlight(text, model), [text, model]);
+  return (
+    <>
+      {spans.map((s, i) =>
+        s.mark ? (
+          <mark key={i} className={`hl-${s.mark}`}>
+            {s.text}
+          </mark>
+        ) : (
+          s.text
+        ),
+      )}
+    </>
+  );
+}
+
+/** この会社のこれまでの判定と、過去の判定に照らした傾き */
+function CompanyHistory({ company, title, model }: { company: string; title: string; model: LearnModel | null }) {
+  if (!model || model.n < 10) return null;
+  const c = model.companies.get(company);
+  const lean = leaning(title, company, model);
+  const tip = lean >= 1.5 ? '読む寄り' : lean <= -1.5 ? '不要寄り' : '';
+  if (!c && !tip) return null;
+  return (
+    <span className="history">
+      {c && `これまで 読む${c.keep}・不要${c.drop}`}
+      {tip && <b className={lean > 0 ? 'lean keep' : 'lean drop'}>{tip}</b>}
+    </span>
   );
 }

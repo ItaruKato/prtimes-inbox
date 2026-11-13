@@ -323,3 +323,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 .readbtn{border-color:var(--keep);color:var(--keep);font-weight:600}
 .readbar .jbtn{white-space:nowrap}
 @media (max-width:760px){.readbar{gap:6px}.readbar .jbtn{padding:13px 6px;font-size:15px}.readbar .jbtn.undo,.readbar .jbtn.skip,.readbar .jbtn.memo{font-size:13px;padding:13px 8px}}
+
+/* 判定カードの強調（太字：重要語、緑：読む寄りの言葉、灰：不要寄りの言葉） */
+mark{background:none;color:inherit}
+mark.hl-key{font-weight:800;color:var(--accent);background:color-mix(in srgb,transparent 80%,var(--accent-soft));border-radius:3px}
+mark.hl-keep{color:var(--keep);background:var(--keep-soft);border-radius:3px;padding:0 1px}
+mark.hl-drop{color:var(--ink-3);text-decoration:line-through;text-decoration-color:color-mix(in srgb,transparent 50%,var(--ink-3));text-decoration-thickness:1px}
+.cardlead mark.hl-key{font-weight:700}
+.history{margin-left:8px;font-size:12px;color:var(--ink-3)}
+.lean{margin-left:6px;font-size:11px;border-radius:999px;padding:0 7px;border:1px solid currentColor}
+.lean.keep{color:var(--keep)}
+.lean.drop{color:var(--drop)}
