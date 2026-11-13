@@ -14,6 +14,7 @@ import { DetailPane } from './components/DetailPane';
 import { TabBar } from './components/TabBar';
 import { ToastView } from './components/ToastView';
 import { JudgePage } from './components/JudgePage';
+import { ReaderPage } from './components/ReaderPage';
 const ReviewPage = lazy(() => import('./components/ReviewPage').then((m) => ({ default: m.ReviewPage })));
 
 // ?stress=1 で 3,000件/日×2日 の負荷テスト用データ
@@ -88,7 +89,7 @@ function Inbox({
       } else if (t.sel && k === 'o') {
         const it = t.byId.get(t.sel);
         if (it) window.open(it.url, '_blank', 'noopener');
-      } else if (k === 'escape') t.setSel(null);
+      } else if (k === 'escape') t.closeDetail();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -102,6 +103,8 @@ function Inbox({
       <section className="main">
         {t.page === 'judge' ? (
           <JudgePage t={t} range={range} onRange={onRange} />
+        ) : t.page === 'reader' ? (
+          <ReaderPage t={t} />
         ) : t.page === 'review' ? (
           <Suspense fallback={<div className="empty">読み込み中…</div>}>
             <ReviewPage t={t} />

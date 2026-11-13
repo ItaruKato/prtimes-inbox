@@ -309,3 +309,17 @@ button{font:inherit;color:inherit;cursor:pointer}
 .samebox .samehead{display:flex;gap:6px;align-items:center;font-weight:600;color:var(--ink)}
 .samebox ul{margin:0;padding-left:1.4em;display:grid;gap:2px}
 .samebox a{color:var(--ink);text-decoration:none}
+
+/* 読む（1件ずつ） */
+.readai{display:flex;flex-direction:column;gap:6px;font-size:13px;flex:none}
+.readsum{margin:0;font-size:14px;line-height:1.7;color:var(--ink);background:var(--accent-soft);border-radius:10px;padding:10px 12px}
+.readblock b{font-size:12px;color:var(--ink-2)}
+.readblock ul{margin:2px 0 0;padding-left:1.2em;display:grid;gap:2px;color:var(--ink)}
+.readfits{display:flex;flex-wrap:wrap;gap:4px}
+.readfits .pill{border:1px solid var(--accent-soft);border-radius:999px;padding:0 8px;font-size:11px;color:var(--accent)}
+.judgebar.readbar{grid-template-columns:auto 1fr auto auto 1fr}
+.jbtn.memo{background:var(--surface)}
+.nav.sub{padding-top:4px;padding-bottom:4px;font-size:13px}
+.readbtn{border-color:var(--keep);color:var(--keep);font-weight:600}
+.readbar .jbtn{white-space:nowrap}
+@media (max-width:760px){.readbar{gap:6px}.readbar .jbtn{padding:13px 6px;font-size:15px}.readbar .jbtn.undo,.readbar .jbtn.skip,.readbar .jbtn.memo{font-size:13px;padding:13px 8px}}

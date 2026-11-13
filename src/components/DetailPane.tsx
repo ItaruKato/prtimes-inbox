@@ -54,7 +54,7 @@ export function DetailPane({ t }: { t: Triage }) {
 
   const close = (dir: number) => {
     setLeaving(dir);
-    setTimeout(() => t.setSel(null), 160);
+    setTimeout(() => t.closeDetail(), 160);
   };
   // 指での右スワイプ（左へは動かさない）。メモの入力欄の中から始めたときは使わない
   const onTouchStart = (e: React.TouchEvent) => {
@@ -118,7 +118,7 @@ export function DetailPane({ t }: { t: Triage }) {
       }
     >
       <div className="dhead">
-        <button className="close" type="button" onClick={() => t.setSel(null)}>‹ 一覧へ</button>
+        <button className="close" type="button" onClick={() => t.closeDetail()}>‹ 戻る</button>
         <span className="muted small">{VIEWS.find((v) => v.k === st)!.label}</span>
       </div>
       <div className="dbody">

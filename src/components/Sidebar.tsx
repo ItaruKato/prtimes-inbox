@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { Triage } from '../state/useTriage';
 import { VIEWS } from '../lib/tags';
 import { num } from '../lib/format';
@@ -23,13 +24,24 @@ export function Sidebar({ t, dataLabel, onSignOut }: { t: Triage; dataLabel: str
           <span className="n">⇆</span>
         </button>
         {VIEWS.map((v) => (
-          <button key={v.k} className="nav" type="button" aria-current={t.page === 'triage' && t.view === v.k} onClick={() => { t.setPage('triage'); t.setView(v.k); }}>
-            <span>
-              {v.label}
-              {v.note && <small className="navnote">{v.note}</small>}
-            </span>
-            <span className="n">{num(t.counts[v.k])}</span>
-          </button>
+          <Fragment key={v.k}>
+            <button className="nav" type="button" aria-current={t.page === 'triage' && t.view === v.k} onClick={() => { t.setPage('triage'); t.setView(v.k); }}>
+              <span>
+                {v.label}
+                {v.note && <small className="navnote">{v.note}</small>}
+              </span>
+              <span className="n">{num(t.counts[v.k])}</span>
+            </button>
+            {v.k === 'keep' && (
+              <button className="nav sub" type="button" aria-current={t.page === 'reader'} onClick={() => t.setPage('reader')}>
+                <span>
+                  └ 1件ずつ読む
+                  <small className="navnote">読了／不要／あとで</small>
+                </span>
+                <span className="n">⇆</span>
+              </button>
+            )}
+          </Fragment>
         ))}
       </nav>
       {t.aiStatus && (

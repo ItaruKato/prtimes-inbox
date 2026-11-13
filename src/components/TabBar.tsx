@@ -14,7 +14,7 @@ export function TabBar({ t }: { t: Triage }) {
         <button
           key={v.k}
           type="button"
-          aria-current={t.page === 'triage' && t.view === v.k}
+          aria-current={(t.page === 'triage' && t.view === v.k) || (t.page === 'reader' && v.k === 'keep')}
           onClick={() => {
             t.setPage('triage');
             t.setView(v.k);

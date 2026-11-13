@@ -22,6 +22,11 @@ export function TopBar({ t, range, onRange }: { t: Triage; range?: RangeKey; onR
         <span className="meta">
           {num(t.visible.length)}件{v.note ? ` ・ ${v.note}` : ''}
         </span>
+        {t.view === 'keep' && t.visible.length > 0 && (
+          <button type="button" className="chip readbtn" onClick={() => t.setPage('reader')}>
+            ⇆ 1件ずつ読む
+          </button>
+        )}
         <span className="search">
           <input
             ref={qRef}

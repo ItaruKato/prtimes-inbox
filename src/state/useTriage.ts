@@ -73,7 +73,16 @@ export function useTriage(repo: Repo) {
   useEffect(() => repo.subscribeRuleReports(setReports), [repo]);
   /** 表示中の画面（振り分け／ルールの点検） */
   // 起動時は「判定」から始める
-  const [page, setPage] = useState<'triage' | 'review' | 'judge'>('judge');
+  const [page, setPage] = useState<'triage' | 'review' | 'judge' | 'reader'>('judge');
+  /** 記事の詳細を閉じたときに戻る画面（「1件ずつ読む」からメモを開いたときは、そこへ戻る） */
+  const [backTo, setBackTo] = useState<'reader' | null>(null);
+  const closeDetail = useCallback(() => {
+    setSel(null);
+    if (backTo) {
+      setPage(backTo);
+      setBackTo(null);
+    }
+  }, [backTo]);
   /** 読み込んでいない「不要」の記事の数（件数の表示に足す） */
   const [hiddenDrops, setHiddenDrops] = useState(0);
   // 「不要」にした記事は、不要の一覧・検索・点検のときだけ読み込む
@@ -345,6 +354,8 @@ export function useTriage(repo: Repo) {
     setQ,
     sel,
     setSel,
+    closeDetail,
+    setBackTo,
     ...derived,
     // 読み込み中は、前回保存した件数を出す（0件が並ばないように）
     counts: loading && preview ? preview.counts : counts,

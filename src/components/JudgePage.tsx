@@ -16,7 +16,7 @@ const SWIPE = 70; // これ以上ずらしたら判定する（px）
 const FLICK_MIN = 30;
 const FLICK_SPEED = 0.35;
 
-type Dir = 'keep' | 'drop';
+export type Dir = 'keep' | 'drop';
 
 /** 判定：受信箱の記事を1件ずつカードで出し、読む／不要を決める（右スワイプ＝読む、左スワイプ＝不要） */
 export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; onRange?: (k: RangeKey) => void }) {
@@ -253,18 +253,25 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
   );
 }
 
-function Card({
+/** 1件ずつのカード（判定・読む で共通）。右スワイプ＝keep、左スワイプ＝drop */
+export function Card({
   it,
   full,
   behind,
   leaving,
   onSwipe,
+  stamps = { keep: '読む', drop: '不要' },
+  extra,
 }: {
   it: Item;
   full: Article | null | undefined;
   behind?: boolean;
   leaving?: Dir | 'skip' | null;
   onSwipe?: (d: Dir) => void;
+  /** スワイプ中に出す文字 */
+  stamps?: { keep: string; drop: string };
+  /** 本文の冒頭の前に出すもの（読む画面の AI の要点など） */
+  extra?: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; dx: number; id: number; lock: 'x' | 'y' | null; t: number; v: number } | null>(null);
@@ -354,8 +361,8 @@ function Card({
     >
       {!behind && (
         <>
-          <span className="stamp keep" style={{ opacity: Math.max(0, Math.min(1, x / SWIPE)) }}>読む</span>
-          <span className="stamp drop" style={{ opacity: Math.max(0, Math.min(1, -x / SWIPE)) }}>不要</span>
+          <span className="stamp keep" style={{ opacity: Math.max(0, Math.min(1, x / SWIPE)) }}>{stamps.keep}</span>
+          <span className="stamp drop" style={{ opacity: Math.max(0, Math.min(1, -x / SWIPE)) }}>{stamps.drop}</span>
         </>
       )}
       <div className="cardmeta">
@@ -366,7 +373,8 @@ function Card({
       <h2 className="cardtitle">{it.title}</h2>
       <div className="cardcompany">{it.company}</div>
       {!behind && <CompanyFactsView articleId={it.id} compact />}
-      {summary && <p className="cardsummary">{summary}</p>}
+      {!behind && extra}
+      {summary && !extra && <p className="cardsummary">{summary}</p>}
       <div className="cardlead">{full === undefined ? '本文を読み込み中…' : lead || '本文の冒頭はありません。'}</div>
       <a className="btn cardopen" href={it.url} target="_blank" rel="noopener noreferrer">
         PR TIMESで開く ↗
