@@ -152,9 +152,9 @@ export async function classifyIndustry(client: Anthropic, db: Firestore, key: Mo
   return { ...tidyIndustry(o), v: INDUSTRY_V, model: r.model ?? model, at: new Date().toISOString() };
 }
 
-/** 1回（5分ごと）に処理する数。全社（約5万社）を2日ほどで付ける */
-const PER_RUN = 80;
-const PARALLEL = 6;
+/** 1回（5分ごと）に処理する数。2026-11-13 本人の指示で速めた（80社・6並び → 160社・10並び。1時間に約1,900社） */
+const PER_RUN = 160;
+const PARALLEL = 10;
 const MAX_TRIES = 3;
 const ID_RE = /^\d+$/;
 
@@ -167,7 +167,7 @@ export async function industrySweep(deps: {
 }) {
   const { db } = deps;
   const r = await withLease(db, 'industry', 290_000, async () => {
-    const until = Date.now() + (deps.budgetMs ?? 220_000);
+    const until = Date.now() + (deps.budgetMs ?? 240_000);
     await db.collection('meta').doc('industryTags').set({ v: INDUSTRY_V, tags: INDUSTRY_TAGS, models: INDUSTRY_MODELS });
     const q = await db.collection('industryQueue').orderBy('at').limit(PER_RUN).get();
     const counts: Record<string, number> = {};
