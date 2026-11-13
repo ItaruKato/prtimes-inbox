@@ -161,6 +161,22 @@ const jst = (ms, len) => {
   for (const x of last24) cnt[x.status] = (cnt[x.status] ?? 0) + 1;
   log(`直近24時間の手動判定: ${last24.length}件 ${JSON.stringify(cnt)}`);
   log(`理由なしで不要: ${manualDrops.length - withReason.length}件`);
+  // 判定の根拠（決め手の言葉・ひとこと・理由のボタン）。件数だけ（言葉や文は出さない）
+  const basis = { keep: { terms: 0, note: 0, tags: 0 }, drop: { terms: 0, note: 0, tags: 0 } };
+  const termSet = { keep: new Set(), drop: new Set() };
+  const tagCount2 = {};
+  for (const x of manual) {
+    const side = x.status === 'drop' ? 'drop' : x.status === 'keep' || x.status === 'done' ? 'keep' : null;
+    if (!side) continue;
+    if ((x.terms ?? []).length) basis[side].terms++;
+    for (const w of x.terms ?? []) termSet[side].add(w);
+    if (x.reason) basis[side].note++;
+    if ((x.reasonTags ?? []).length) basis[side].tags++;
+    for (const t of x.reasonTags ?? []) tagCount2[t] = (tagCount2[t] ?? 0) + 1;
+  }
+  log(
+    `判定の根拠: 読む側 決め手${basis.keep.terms}件（言葉${termSet.keep.size}種）・ひとこと${basis.keep.note}件・理由${basis.keep.tags}件 / 不要側 決め手${basis.drop.terms}件（言葉${termSet.drop.size}種）・ひとこと${basis.drop.note}件・理由${basis.drop.tags}件 / 理由の内訳 ${JSON.stringify(tagCount2)}`,
+  );
 
   try {
     const errs = execSync(
