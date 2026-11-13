@@ -142,9 +142,10 @@ const jst = (ms, len) => {
   const groups = {};
   for (const x of fresh) for (const k of (x.reasonTags ?? []).length ? x.reasonTags : ['（自由記入のみ）']) (groups[k] ??= []).push(x);
   log(`見直しの材料（どのルールにも当たらない「理由あり」${fresh.length}件）: ${JSON.stringify(Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length])))}`);
+  // 自由記入（ひとこと）は色付けの学習用。ルールの材料にはせず、文も記録に出さない（理由のボタンの種類だけをルール化の対象にする）
   for (const [k, v] of Object.entries(groups))
-    if (v.length >= RULE_MIN)
-      log(`ルール化の候補「${k}」${v.length}件（${RULE_MIN}件以上）:\n` + v.map((x) => `- at=${x.at}｜${x.title}｜${x.company}${x.reason ? `｜${x.reason}` : ''}`).join('\n'));
+    if (v.length >= RULE_MIN && k !== '（自由記入のみ）')
+      log(`ルール化の候補「${k}」${v.length}件（${RULE_MIN}件以上）:\n` + v.map((x) => `- at=${x.at}｜${x.title}｜${x.company}`).join('\n'));
   const byRule = {};
   for (const x of restored)
     for (const r of x.ruleIds) {
@@ -173,6 +174,31 @@ const jst = (ms, len) => {
     if (x.reason) basis[side].note++;
     if ((x.reasonTags ?? []).length) basis[side].tags++;
     for (const t of x.reasonTags ?? []) tagCount2[t] = (tagCount2[t] ?? 0) + 1;
+  }
+  // 色付け（学習）の当たり具合：その日より前の判定で学び、その日の判定に「読む寄り／不要寄り」を出したら当たったか（件数だけ）
+  try {
+    const { buildModel, leaning } = require(path.join(__dirname, '..', 'functions', 'lib', 'src', 'lib', 'learn.js'));
+    const sides = manual.filter((x) => x.title && ['keep', 'done', 'drop'].includes(x.status));
+    const rows = [];
+    for (let k = 2; k >= 0; k--) {
+      const from = now - (k + 1) * 86400e3;
+      const to = now - k * 86400e3;
+      const model = buildModel(sides.filter((x) => x.at < from));
+      const test = sides.filter((x) => x.at >= from && x.at < to);
+      const r = { n: test.length, keepBadge: 0, keepHit: 0, dropBadge: 0, dropHit: 0, keepRate: 0 };
+      for (const x of test) {
+        const keep = x.status !== 'drop';
+        if (keep) r.keepRate++;
+        const l = leaning(x.title, x.company ?? '', model);
+        if (l >= 1.5) (r.keepBadge++, keep && r.keepHit++);
+        if (l <= -1.5) (r.dropBadge++, !keep && r.dropHit++);
+      }
+      const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+      rows.push(`${k}日前: 判定${r.n}件（うち読む ${pct(r.keepRate, r.n)}）/ 「読む寄り」${r.keepBadge}件→読む ${pct(r.keepHit, r.keepBadge)} / 「不要寄り」${r.dropBadge}件→不要 ${pct(r.dropHit, r.dropBadge)} / 学んだ言葉 ${model.terms.size}語`);
+    }
+    log('色付け（学習）の当たり具合（その日より前の判定で学んだ場合）:\n' + rows.join('\n'));
+  } catch (e) {
+    log(`色付けの当たり具合を出せませんでした: ${String(e).slice(0, 200)}`);
   }
   log(
     `判定の根拠: 読む側 決め手${basis.keep.terms}件（言葉${termSet.keep.size}種）・ひとこと${basis.keep.note}件・理由${basis.keep.tags}件 / 不要側 決め手${basis.drop.terms}件（言葉${termSet.drop.size}種）・ひとこと${basis.drop.note}件・理由${basis.drop.tags}件 / 理由の内訳 ${JSON.stringify(tagCount2)}`,

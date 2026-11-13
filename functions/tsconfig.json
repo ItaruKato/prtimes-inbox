@@ -16,6 +16,7 @@
   "include": [
     "src",
     "../src/lib/exclusion.ts",
-    "../src/lib/dayIndex.ts"
+    "../src/lib/dayIndex.ts",
+    "../src/lib/learn.ts"
   ]
 }
