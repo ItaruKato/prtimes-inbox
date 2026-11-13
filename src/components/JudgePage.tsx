@@ -36,6 +36,7 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
   const [picked, setPicked] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+  const noteRef = useRef<HTMLInputElement>(null);
   const togglePick = useCallback((w: string) => setPicked((p) => (p.includes(w) ? p.filter((x) => x !== w) : [...p, w].slice(-10))), []);
   const [leaving, setLeaving] = useState<Dir | 'skip' | null>(null);
 
@@ -243,7 +244,15 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
             </div>
           )}
           <div className="reasonchips judgereasons basisrow" role="group" aria-label="理由（任意）">
-            <button type="button" className="chip note" aria-pressed={noteOpen || !!note} onClick={() => setNoteOpen((o) => !o)}>
+            <button
+              type="button"
+              className="chip note"
+              aria-pressed={noteOpen || !!note}
+              onClick={() => {
+                setNoteOpen((o) => !o);
+                setTimeout(() => noteRef.current?.focus(), 0);
+              }}
+            >
               ✎ ひとこと
             </button>
             <span className="basislabel keep">読む理由</span>
@@ -259,11 +268,12 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
               </button>
             ))}
           </div>
-          {noteOpen && (
+          {/* PC は常に表示。スマホは「ひとこと」を押したときだけ出す（CSS で切り替え） */}
+          {(
             <input
-              className="basisnote"
+              ref={noteRef}
+              className={noteOpen ? 'basisnote open' : 'basisnote'}
               value={note}
-              autoFocus
               enterKeyHint="done"
               placeholder="判断の根拠をひとこと（例：物流の提案先になりそう）"
               onChange={(e) => setNote(e.target.value)}

@@ -349,3 +349,6 @@ mark.hl-drop{color:var(--ink-3);text-decoration:line-through;text-decoration-col
 .pick{cursor:pointer;border-radius:3px}
 .pick:hover{background:color-mix(in srgb,transparent 85%,var(--accent))}
 .pick.picked{outline:2px solid var(--accent);outline-offset:1px;background:color-mix(in srgb,transparent 80%,var(--accent))}
+/* 根拠のひとこと：PC は常に入力欄を出し、スマホは「ひとこと」を押したときだけ出す */
+@media (min-width:761px){.chip.note{display:none}}
+@media (max-width:760px){.basisnote:not(.open){display:none}}
