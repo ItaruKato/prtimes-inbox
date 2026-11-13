@@ -53,6 +53,17 @@ export const EXCLUSION_RULES: ExclusionRule[] = [
     updated: '2026-11-09',
     test: isGame,
   },
+  titleRule({
+    id: 'anime',
+    label: 'アニメ（消費者向け）',
+    description:
+      'TVアニメの放送・グッズ・コラボカフェ・声優・VTuber のイベントなど、消費者向けのアニメ関連。アニメ関連でも、資金調達・上場・M&A・提携・出資・事業・法人向け・ライセンス・マーケティング・調査などビジネスの話は除外しない。',
+    updated: '2026-11-13',
+    include: /アニメ|声優|劇場版|原画展|コラボカフェ|アニメイト|Vtuber|VTuber|ホロライブ|にじさんじ/,
+    except: new RegExp(
+      `${ALWAYS_KEEP.source}|業務提携|提携|出資|ファンド|事業|法人|BtoB|SaaS|海外展開|ライセンス|IPビジネス|AI|DX|制作会社|スタジオ設立|採用|研修|調査|レポート|決算|新会社|設立|マーケティング|広告代理|動画制作|営業`,
+    ),
+  }),
 ];
 
 export const ruleLabel = (id: string) => EXCLUSION_RULES.find((r) => r.id === id)?.label ?? id;
