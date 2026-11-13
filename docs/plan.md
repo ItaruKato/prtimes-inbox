@@ -101,7 +101,7 @@
 
 ## 共有の決まり（上書き事故を防ぐ）
 同じ Firebase プロジェクト `prtimes-inbox`（asia-northeast1）を3つのアプリで使う。次を守らないと、ほかのアプリの本番を消したり上書きしたりする。
-1. **Firestore のルールと索引は `ItaruKato/prtimes-inbox` の `firestore.rules`・`firestore.indexes.json` だけで管理する。** 新しいアプリのコレクション（例：`longlist`）のルール・索引も、このリポジトリに足してデプロイする。ほかのリポジトリからは Firestore をデプロイしない（Watcher のデプロイは `--force` なので、ファイルにない索引は消える）。
+1. **Firestore のルールと索引は `ItaruKato/prtimes-inbox` の `firestore.rules`・`firestore.indexes.json` だけで管理する。** 新しいアプリのコレクション（例：`longlist`）のルール・索引も、このリポジトリに足してデプロイする。ほかのリポジトリからは Firestore をデプロイしない（Watcher のデプロイは画面・関数・ルールを `--force` で、索引は別の手順で `--force` なしに出す。ベクトル索引は firebase-tools が既存と見分けられず 409 になるので、索引の手順は失敗しても止めない）。
 2. **Cloud Functions は codebase を分ける。** 新しいリポジトリの `firebase.json` の functions に `"codebase": "longlist"` のように別の名前を付け、デプロイは `--only functions:longlist,hosting:longlist` に限る（同じ codebase だと、Watcher の関数が「ソースにない」として消される）。
 3. **Hosting は別のサイトにする。** 例：`firebase hosting:sites:create prtimes-longlist` → `https://prtimes-longlist.web.app`。`firebase.json` の hosting に `"target"` を付け、`.firebaserc` で結びつける（同じサイトに出すと Watcher の画面が上書きされる）。
 4. **ログインの許可ドメインを足す。** Firebase コンソール → Authentication → 設定 → 承認済みドメインに、新しいサイトのドメイン（例：`prtimes-longlist.web.app`）を足す（本人の操作）。

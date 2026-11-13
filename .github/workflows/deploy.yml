@@ -42,6 +42,12 @@ jobs:
       - name: 通知の送信・音声の書き起こしに必要な API を有効にする
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.PROJECT_NUMBER != ''
         run: gcloud services enable fcm.googleapis.com fcmregistrations.googleapis.com firebaseinstallations.googleapis.com speech.googleapis.com --project "$PROJECT_ID"
-      - name: Firebase にデプロイ
+      - name: Firebase にデプロイ（画面・関数・データベースのルール）
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.PROJECT_NUMBER != ''
-        run: npx -y firebase-tools@14.11.0 deploy --project "$PROJECT_ID" --non-interactive --force
+        run: npx -y firebase-tools@14.11.0 deploy --only hosting,functions,firestore:rules --project "$PROJECT_ID" --non-interactive --force
+      # 索引は別に出す。ベクトル索引（kbIndex の emb）は、すでにあっても firebase-tools が「無い」と見て作ろうとし 409 になるため、
+      # ここが失敗しても画面・関数の反映は止めない。--force は付けない（ファイルにない索引を消さない）
+      - name: Firestore の索引
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.PROJECT_NUMBER != ''
+        continue-on-error: true
+        run: npx -y firebase-tools@14.11.0 deploy --only firestore:indexes --project "$PROJECT_ID" --non-interactive
