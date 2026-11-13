@@ -38,3 +38,18 @@ describe('言葉の強調と学習', () => {
     expect(highlight('シリーズAで10億円', m).filter((s) => s.mark === 'key').map((s) => s.text)).toEqual(['シリーズA', '10億円']);
   });
 });
+
+describe('根拠として選んだ言葉', () => {
+  it('選んだ言葉は1回でも強く学ぶ', () => {
+    const decs: Decision[] = [
+      ...Array.from({ length: 5 }, (_, i) => d(`記事${i}の資金調達`, 'keep')),
+      ...Array.from({ length: 5 }, (_, i) => d(`記事${i}の新商品`, 'drop', 'B社')),
+      { ...d('X社がオンラインくじを開始', 'drop'), terms: ['オンラインくじ'] },
+      { ...d('Y社が物流DXの実証', 'keep'), terms: ['物流DX'], reason: 'ロボティクスの提案先' },
+    ];
+    const m = buildModel(decs);
+    expect(m.terms.get('オンラインくじ')!).toBeLessThan(0);
+    expect(m.terms.get('物流dx')!).toBeGreaterThan(0);
+    expect(highlight('Z社が物流DXを推進', m).find((s) => s.text === '物流DX')?.mark).toBe('keep');
+  });
+});

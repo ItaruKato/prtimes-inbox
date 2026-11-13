@@ -50,8 +50,10 @@ export interface Decision {
   aiScore?: Score;
   /** 不要にした理由（自由記入）。除外ルールを見直す材料にする */
   reason?: string;
-  /** 不要にした理由（選択肢。src/lib/exclusion.ts の REASON_PRESETS） */
+  /** 判断の理由（選択肢。不要は src/lib/exclusion.ts の REASON_PRESETS、読むは KEEP_PRESETS） */
   reasonTags?: string[];
+  /** 判断の決め手になった言葉（判定カードでタップして選んだもの。学習に強く反映する） */
+  terms?: string[];
   /** 自動除外ルールに当てはまっていた記事か（受信箱に戻したら、そのルールの見直し材料） */
   ruleIds?: string[];
 }

@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Article, Item, Status } from '../types';
 import type { TagFilter, Triage } from '../state/useTriage';
 import { TAGS } from '../lib/tags';
-import { REASON_PRESETS } from '../lib/exclusion';
+import { KEEP_PRESETS, REASON_PRESETS } from '../lib/exclusion';
 import { fullDate, num } from '../lib/format';
 import { TagPills } from './TagPills';
 import { NotifyBox } from './NotifyBox';
 import { RANGES, type RangeKey } from '../lib/range';
 import { relatedItems } from '../lib/sameEvent';
 import { CompanyFactsView } from './CompanyFactsView';
-import { highlight, leaning, type LearnModel } from '../lib/learn';
+import { groupMarks, highlight, leaning, markChars, runsOf, type LearnModel } from '../lib/learn';
 
 const LS_ORDER = 'prt-judge-order';
 const SWIPE = 70; // これ以上ずらしたら判定する（px）
@@ -32,6 +32,11 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
   const [history, setHistory] = useState<{ id: string; dir: Dir; undo?: () => void }[]>([]);
   const [reasons, setReasons] = useState<string[]>([]);
+  /** 判断の決め手としてタップした言葉と、ひとことの根拠 */
+  const [picked, setPicked] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const [noteOpen, setNoteOpen] = useState(false);
+  const togglePick = useCallback((w: string) => setPicked((p) => (p.includes(w) ? p.filter((x) => x !== w) : [...p, w].slice(-10))), []);
   const [leaving, setLeaving] = useState<Dir | 'skip' | null>(null);
 
   // 受信箱に残っている記事（判定するたびに先頭が次の記事になる）
@@ -77,16 +82,21 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
           return n;
         });
       } else {
-        const undos = [t.setStatus(cur.id, dir as Status, { quiet: true, reasonTags: dir === 'drop' ? reasons : undefined })];
+        // 根拠：理由のボタンは判定の向きに合うものだけ、決め手の言葉とひとことはそのまま
+        const tags = reasons.filter((r) => (dir === 'drop' ? (REASON_PRESETS as readonly string[]) : (KEEP_PRESETS as readonly string[])).includes(r));
+        const undos = [t.setStatus(cur.id, dir as Status, { quiet: true, reasonTags: tags, reason: note, terms: picked })];
         // 同じ発表の別の記事は「不要（同じ発表）」にする（読むにしたときも、読むのは1件で足りるため）
         for (const o of others) undos.push(t.setStatus(o.id, 'drop', { quiet: true, how: 'dup' }));
         const undo = () => undos.forEach((u) => u?.());
         setHistory((h) => [...h.slice(-49), { id: cur.id, dir, undo }]);
       }
       setReasons([]);
+      setPicked([]);
+      setNote('');
+      setNoteOpen(false);
       setLeaving(null);
     },
-    [cur, reasons, t, grouped, related],
+    [cur, reasons, note, picked, t, grouped, related],
   );
 
   /** カードを飛ばしてから判定する（ボタン・キーボード・スワイプ共通） */
@@ -188,6 +198,8 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
           <Card
             key={cur.id}
             model={t.learned}
+            picked={picked}
+            onPick={togglePick}
             it={cur}
             full={full[cur.id]}
             leaving={leaving}
@@ -219,18 +231,45 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
       )}
 
       {cur && (
-        <div className="reasonchips judgereasons" role="group" aria-label="不要の理由（任意）">
-          {REASON_PRESETS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className="chip"
-              aria-pressed={reasons.includes(p)}
-              onClick={() => setReasons((r) => (r.includes(p) ? r.filter((x) => x !== p) : [...r, p]))}
-            >
-              {p}
+        <div className="basis" aria-label="判断の根拠（任意）">
+          {picked.length > 0 && (
+            <div className="basispicked">
+              <span className="basislabel">決め手</span>
+              {picked.map((w) => (
+                <button key={w} type="button" className="chip on" onClick={() => togglePick(w)} aria-label={`${w} を外す`}>
+                  {w} ×
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="reasonchips judgereasons basisrow" role="group" aria-label="理由（任意）">
+            <button type="button" className="chip note" aria-pressed={noteOpen || !!note} onClick={() => setNoteOpen((o) => !o)}>
+              ✎ ひとこと
             </button>
-          ))}
+            <span className="basislabel keep">読む理由</span>
+            {KEEP_PRESETS.map((p) => (
+              <button key={p} type="button" className="chip" aria-pressed={reasons.includes(p)} onClick={() => setReasons((r) => (r.includes(p) ? r.filter((x) => x !== p) : [...r, p]))}>
+                {p}
+              </button>
+            ))}
+            <span className="basislabel drop">不要理由</span>
+            {REASON_PRESETS.map((p) => (
+              <button key={p} type="button" className="chip" aria-pressed={reasons.includes(p)} onClick={() => setReasons((r) => (r.includes(p) ? r.filter((x) => x !== p) : [...r, p]))}>
+                {p}
+              </button>
+            ))}
+          </div>
+          {noteOpen && (
+            <input
+              className="basisnote"
+              value={note}
+              autoFocus
+              enterKeyHint="done"
+              placeholder="判断の根拠をひとこと（例：物流の提案先になりそう）"
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && (e.currentTarget as HTMLInputElement).blur()}
+            />
+          )}
         </div>
       )}
 
@@ -249,7 +288,7 @@ export function JudgePage({ t, range, onRange }: { t: Triage; range?: RangeKey; 
         </button>
       </div>
       <p className="judgehint muted small">
-        右にスワイプで「読む」、左にスワイプで「不要」（軽くはじくだけでも判定します）。太字は金額・ラウンド・上場などの重要語、緑はあなたが読む記事によく出る言葉、灰色は不要にする記事によく出る言葉です。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
+        右にスワイプで「読む」、左にスワイプで「不要」（軽くはじくだけでも判定します）。タイトルや本文の言葉をタップすると「決め手」として覚えます。太字は金額・ラウンド・上場などの重要語、緑はあなたが読む記事によく出る言葉、灰色は不要にする記事によく出る言葉です。PCは → / ← キー（↓ スキップ、Z 戻す、O 開く）。理由を選んでから「不要」にすると理由も記録します。
       </p>
     </section>
   );
@@ -265,6 +304,8 @@ export function Card({
   stamps = { keep: '読む', drop: '不要' },
   extra,
   model = null,
+  picked,
+  onPick,
 }: {
   it: Item;
   full: Article | null | undefined;
@@ -277,6 +318,9 @@ export function Card({
   extra?: React.ReactNode;
   /** これまでの判定から学んだ言葉（強調に使う） */
   model?: LearnModel | null;
+  /** 判断の決め手として選んだ言葉（タップで選ぶ・外す） */
+  picked?: string[];
+  onPick?: (w: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; dx: number; id: number; lock: 'x' | 'y' | null; t: number; v: number } | null>(null);
@@ -319,10 +363,12 @@ export function Card({
   };
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType !== 'mouse') return;
-    if (start(e.clientX, e.clientY, e.pointerId, e.target)) ref.current?.setPointerCapture(e.pointerId);
+    start(e.clientX, e.clientY, e.pointerId, e.target);
   };
   const onMove = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && drag.current?.id === e.pointerId) move(e.clientX, e.clientY);
+    if (e.pointerType !== 'mouse' || drag.current?.id !== e.pointerId) return;
+    // 横に動かし始めてからつかむ（つかんだままだと、言葉のクリックがカードに取られるため）
+    if (move(e.clientX, e.clientY) && !ref.current?.hasPointerCapture(e.pointerId)) ref.current?.setPointerCapture(e.pointerId);
   };
   const onUp = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse') end();
@@ -376,7 +422,7 @@ export function Card({
         <span className="muted small">{fullDate(it.ts)}</span>
       </div>
       <h2 className="cardtitle">
-        <Marked text={it.title} model={model} />
+        <Marked text={it.title} model={model} picked={behind ? undefined : picked} onPick={behind ? undefined : onPick} />
       </h2>
       <div className="cardcompany">
         {it.company}
@@ -386,7 +432,13 @@ export function Card({
       {!behind && extra}
       {summary && !extra && <p className="cardsummary">{summary}</p>}
       <div className="cardlead">
-        {full === undefined ? '本文を読み込み中…' : lead ? <Marked text={lead} model={behind ? null : model} /> : '本文の冒頭はありません。'}
+        {full === undefined ? (
+          '本文を読み込み中…'
+        ) : lead ? (
+          <Marked text={lead} model={behind ? null : model} picked={behind ? undefined : picked} onPick={behind ? undefined : onPick} />
+        ) : (
+          '本文の冒頭はありません。'
+        )}
       </div>
       <a className="btn cardopen" href={it.url} target="_blank" rel="noopener noreferrer">
         PR TIMESで開く ↗
@@ -395,18 +447,47 @@ export function Card({
   );
 }
 
-/** 強調した文（太字：金額・ラウンドなどの重要語、緑：読む寄りの言葉、灰：不要寄りの言葉） */
-export function Marked({ text, model }: { text: string; model: LearnModel | null }) {
-  const spans = useMemo(() => highlight(text, model), [text, model]);
+/** 強調した文（太字：金額・ラウンドなどの重要語、緑：読む寄りの言葉、灰：不要寄りの言葉）。onPick があれば言葉をタップで選べる */
+export function Marked({ text, model, picked, onPick }: { text: string; model: LearnModel | null; picked?: string[]; onPick?: (w: string) => void }) {
+  const parts = useMemo(() => {
+    if (!onPick) return highlight(text, model).map((sp) => ({ spans: [sp], pick: undefined as string | undefined }));
+    const marks = markChars(text, model);
+    const out: { spans: ReturnType<typeof groupMarks>; pick?: string }[] = [];
+    let at = 0;
+    for (const r of runsOf(text)) {
+      if (r.start > at) out.push({ spans: groupMarks(text, marks, at, r.start) });
+      out.push({ spans: groupMarks(text, marks, r.start, r.end), pick: r.text });
+      at = r.end;
+    }
+    if (at < text.length) out.push({ spans: groupMarks(text, marks, at, text.length) });
+    return out;
+  }, [text, model, onPick]);
+  const inner = (spans: ReturnType<typeof groupMarks>) =>
+    spans.map((sp, i) =>
+      sp.mark ? (
+        <mark key={i} className={`hl-${sp.mark}`}>
+          {sp.text}
+        </mark>
+      ) : (
+        <Fragment key={i}>{sp.text}</Fragment>
+      ),
+    );
   return (
     <>
-      {spans.map((s, i) =>
-        s.mark ? (
-          <mark key={i} className={`hl-${s.mark}`}>
-            {s.text}
-          </mark>
+      {parts.map((p, i) =>
+        p.pick && onPick ? (
+          <span
+            key={i}
+            className={picked?.includes(p.pick) ? 'pick picked' : 'pick'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(p.pick!);
+            }}
+          >
+            {inner(p.spans)}
+          </span>
         ) : (
-          s.text
+          <Fragment key={i}>{inner(p.spans)}</Fragment>
         ),
       )}
     </>

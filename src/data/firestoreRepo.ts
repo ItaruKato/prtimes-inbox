@@ -276,7 +276,7 @@ export function createFirestoreRepo(db: Firestore, range: RangeKey = '10'): Repo
         const m = perDay.get(day) ?? {};
         // merge で書くので、消した項目（理由など）は明示的に削除する
         m[id] = d
-          ? ({ ...d, reason: d.reason ?? deleteField(), reasonTags: d.reasonTags ?? deleteField() } as unknown as Decision)
+          ? ({ ...d, reason: d.reason ?? deleteField(), reasonTags: d.reasonTags ?? deleteField(), terms: d.terms ?? deleteField() } as unknown as Decision)
           : deleteField();
         perDay.set(day, m);
         const savedRef = doc(db, 'saved', id);

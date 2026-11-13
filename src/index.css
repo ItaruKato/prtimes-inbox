@@ -334,3 +334,18 @@ mark.hl-drop{color:var(--ink-3);text-decoration:line-through;text-decoration-col
 .lean{margin-left:6px;font-size:11px;border-radius:999px;padding:0 7px;border:1px solid currentColor}
 .lean.keep{color:var(--keep)}
 .lean.drop{color:var(--drop)}
+
+/* 判断の根拠（判定） */
+.basis{display:flex;flex-direction:column;gap:6px;max-width:640px;width:100%;margin:0 auto;flex:none}
+.basisrow{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+.basisrow::-webkit-scrollbar{display:none}
+.basislabel{flex:none;align-self:center;font-size:11px;font-weight:700;color:var(--ink-3);padding-left:4px}
+.basislabel.keep{color:var(--keep)}
+.basislabel.drop{color:var(--drop)}
+.basispicked{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip.on{border-color:var(--accent);background:var(--accent);color:var(--surface)}
+.chip.note{font-weight:600}
+.basisnote{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px}
+.pick{cursor:pointer;border-radius:3px}
+.pick:hover{background:color-mix(in srgb,transparent 85%,var(--accent))}
+.pick.picked{outline:2px solid var(--accent);outline-offset:1px;background:color-mix(in srgb,transparent 80%,var(--accent))}

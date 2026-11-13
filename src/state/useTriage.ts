@@ -233,7 +233,11 @@ export function useTriage(repo: Repo) {
    * opts.reasonTags: 不要の理由（判定画面で選んだもの）／ opts.quiet: 通知を出さない（判定画面は自分で出す）
    */
   const setStatus = useCallback(
-    (id: string, status: Status, opts: { reasonTags?: string[]; quiet?: boolean; how?: Decision['how'] } = {}): (() => void) | undefined => {
+    (
+      id: string,
+      status: Status,
+      opts: { reasonTags?: string[]; reason?: string; terms?: string[]; quiet?: boolean; how?: Decision['how'] } = {},
+    ): (() => void) | undefined => {
       const it = byId.get(id);
       if (!it) return undefined;
       if (status === 'drop') sticky.current.set(id, it);
@@ -253,7 +257,10 @@ export function useTriage(repo: Repo) {
               // 不要のまま操作し直したときは、書いた理由を残す
               ...(status === 'drop' && prev?.reason ? { reason: prev.reason } : {}),
               ...(status === 'drop' && prev?.reasonTags?.length ? { reasonTags: prev.reasonTags } : {}),
-              ...(status === 'drop' && opts.reasonTags?.length ? { reasonTags: opts.reasonTags } : {}),
+              // 判定画面で入れた根拠（読む・不要どちらでも）
+              ...(opts.reasonTags?.length ? { reasonTags: opts.reasonTags } : {}),
+              ...(opts.reason?.trim() ? { reason: opts.reason.trim().slice(0, 500) } : {}),
+              ...(opts.terms?.length ? { terms: opts.terms.slice(0, 20) } : {}),
             };
       const undo = apply({ [id]: change });
       if (!opts.quiet)

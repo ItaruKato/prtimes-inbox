@@ -49,6 +49,13 @@ export function tokenize(text: string): Token[] {
   return out;
 }
 
+/** タップで選べる言葉のまとまり（漢字・カタカナ・英数字の連なり） */
+export function runsOf(text: string): Token[] {
+  const out: Token[] = [];
+  for (const m of text.matchAll(RUN_RE)) if (m[0].length >= 2) out.push({ text: m[0], start: m.index!, end: m.index! + m[0].length });
+  return out;
+}
+
 export interface LearnModel {
   /** 言葉ごとの傾き（＋：読む寄り、−：不要寄り）。目立つものだけ */
   terms: Map<string, number>;
@@ -60,6 +67,8 @@ export interface LearnModel {
 
 const MIN_COUNT = 3;
 const MIN_SCORE = 0.9;
+/** 決め手としてタップした言葉の重み（タイトルに出てきた言葉の何回分か） */
+const TERM_WEIGHT = 3;
 const tokenCache = new Map<string, string[]>();
 const uniq = (title: string) => {
   let t = tokenCache.get(title);
@@ -75,6 +84,8 @@ export function buildModel(decisions: Iterable<Decision>): LearnModel {
   const pos = new Map<string, number>();
   const neg = new Map<string, number>();
   const companies = new Map<string, { keep: number; drop: number }>();
+  const taughtPos = new Set<string>();
+  const taughtNeg = new Set<string>();
   let P = 0;
   let N = 0;
   for (const d of decisions) {
@@ -84,7 +95,16 @@ export function buildModel(decisions: Iterable<Decision>): LearnModel {
     if (keep) P++;
     else N++;
     const m = keep ? pos : neg;
-    for (const w of uniq(d.title)) m.set(w, (m.get(w) ?? 0) + 1);
+    const words = new Set(uniq(d.title));
+    // 自由記入の根拠に出てくる言葉も数える
+    if (d.reason) for (const w of uniq(d.reason)) words.add(w);
+    for (const w of words) m.set(w, (m.get(w) ?? 0) + 1);
+    // 決め手としてタップした言葉は強く数え、件数が少なくても色を付ける
+    for (const t of d.terms ?? []) {
+      const w = t.toLowerCase();
+      m.set(w, (m.get(w) ?? 0) + TERM_WEIGHT);
+      (keep ? taughtPos : taughtNeg).add(w);
+    }
     if (d.company) {
       const c = companies.get(d.company) ?? { keep: 0, drop: 0 };
       if (keep) c.keep++;
@@ -103,6 +123,9 @@ export function buildModel(decisions: Iterable<Decision>): LearnModel {
       if (Math.abs(score) >= MIN_SCORE) terms.set(w, score);
     }
   }
+  // 決め手として選んだ言葉は、その向きで必ず入れる（読む・不要の両方で選んだ言葉は、数えた結果に任せる）
+  for (const w of taughtPos) if (!taughtNeg.has(w)) terms.set(w, Math.max(terms.get(w) ?? 0, MIN_SCORE + 0.6));
+  for (const w of taughtNeg) if (!taughtPos.has(w)) terms.set(w, Math.min(terms.get(w) ?? 0, -(MIN_SCORE + 0.6)));
   return { terms, companies, n: P + N };
 }
 
@@ -116,8 +139,8 @@ export interface Span {
   mark?: Mark;
 }
 
-/** 文を、強調する部分としない部分に分ける */
-export function highlight(text: string, model: LearnModel | null): Span[] {
+/** 文字ごとの強調の印 */
+export function markChars(text: string, model: LearnModel | null): (Mark | undefined)[] {
   const marks: (Mark | undefined)[] = new Array(text.length).fill(undefined);
   if (model?.terms.size) {
     for (const tk of tokenize(text)) {
@@ -127,13 +150,23 @@ export function highlight(text: string, model: LearnModel | null): Span[] {
     }
   }
   for (const m of text.matchAll(KEY_RE)) for (let i = m.index!; i < m.index! + m[0].length; i++) marks[i] = 'key';
+  return marks;
+}
+
+/** 印の続く部分をまとめる */
+export function groupMarks(text: string, marks: (Mark | undefined)[], from = 0, to = text.length): Span[] {
   const out: Span[] = [];
-  for (let i = 0; i < text.length; i++) {
+  for (let i = from; i < to; i++) {
     const last = out[out.length - 1];
     if (last && last.mark === marks[i]) last.text += text[i];
     else out.push({ text: text[i], ...(marks[i] ? { mark: marks[i] } : {}) });
   }
   return out;
+}
+
+/** 文を、強調する部分としない部分に分ける */
+export function highlight(text: string, model: LearnModel | null): Span[] {
+  return groupMarks(text, markChars(text, model));
 }
 
 /** タイトルと会社から、これまでの判定に照らした傾き（＋：読む寄り） */

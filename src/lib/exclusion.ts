@@ -61,6 +61,9 @@ export const ruleLabel = (id: string) => EXCLUSION_RULES.find((r) => r.id === id
 export const matchRules = (a: Article): string[] => EXCLUSION_RULES.filter((r) => r.test(a)).map((r) => r.id);
 
 /** 不要にした理由の選択肢（自由記入と組み合わせて使う） */
+/** 「読む」にした理由の選択肢（判定画面） */
+export const KEEP_PRESETS = ['営業先の候補', '先行事例に使える', '業界が近い', '調達・上場・M&A', '競合・取引先の動き', 'トークのネタ'] as const;
+
 export const REASON_PRESETS = [
   'キャンペーン・セール',
   'イベント・セミナーの告知',
