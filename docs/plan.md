@@ -51,6 +51,7 @@
 | `longlistTrials/{お試しID}` | 業界タグのお試しで選んだ会社と、本人の見直し（○△×） | Long List の画面 |
 | `longlist/{会社ID}` | Long List の温度感・進捗・メモ・次にやること・担当、除外の手直し | Long List の画面 |
 | `kbArticles`・`kbBodies`・`kbIndex`・`kbCompanies`・`kbThemes`・`kbReports`・`kbMeta` | Knowledge Base が整理した記事・会社・テーマ・レポートと、全記事の目録 kbIndex（意味で探すための数値 emb つき。firestore.indexes.json にベクトルの索引）（ItaruKato/knowledge） | Knowledge Base の Cloud Functions |
+| `kbMcpClients`・`kbMcpRequests`・`kbMcpCodes`・`kbMcpTokens` | Claude のチャットの窓口（MCP。Knowledge Base の関数 kbMcp）のログインと合鍵（鍵はハッシュだけ）。画面からは読めない | Knowledge Base の関数 |
 | `kbJobs/{自動ID}`・`kbConfig/{doc}` | Knowledge Base の画面からの依頼（質問など）と画面の設定 | Knowledge Base の画面（依頼・設定）・Cloud Functions（結果） |
 
 会社IDは PR TIMES の会社ID（記事IDの後ろの数字）。法人番号での名寄せは、申請が通ったあとに companies に `corporateNumber` を足す。
@@ -106,7 +107,7 @@
 3. **Hosting は別のサイトにする。** 例：`firebase hosting:sites:create prtimes-longlist` → `https://prtimes-longlist.web.app`。`firebase.json` の hosting に `"target"` を付け、`.firebaserc` で結びつける（同じサイトに出すと Watcher の画面が上書きされる）。
 4. **ログインの許可ドメインを足す。** Firebase コンソール → Authentication → 設定 → 承認済みドメインに、新しいサイトのドメイン（例：`prtimes-longlist.web.app`）を足す（本人の操作）。
 5. **自動デプロイの許可を足す（本人が Cloud Shell で1回）。** いまの GitHub Actions の認証（Workload Identity）は `ItaruKato/prtimes-inbox` の main だけを許可している（`scripts/setup-gcp.sh`）。新しいリポジトリから出すには、プロバイダの条件に新しいリポジトリを足し、`github-deploy@prtimes-inbox.iam.gserviceaccount.com` にそのリポジトリの `roles/iam.workloadIdentityUser` を付ける。権限の変更なので、Claude は自分で付けず、コマンドを案内して本人に実行してもらう。
-6. **画面から関数を直接呼ばない。** 誰でも呼べる関数（allUsers の呼び出し許可）は作らない。画面からの依頼は Firestore（例：`jobs`）に書き、スケジュールの関数が処理する（Watcher の `functions/src/jobs.ts` と同じ形）。
+6. **画面から関数を直接呼ばない。**（例外は1つだけ：Knowledge Base の `kbMcp`。Claude のチャットから読むための窓口で、ネットから届くが OAuth で本人しか使えず、読むだけ。2026-11-13 本人が設計を見て決定） 誰でも呼べる関数（allUsers の呼び出し許可）は作らない。画面からの依頼は Firestore（例：`jobs`）に書き、スケジュールの関数が処理する（Watcher の `functions/src/jobs.ts` と同じ形）。
 7. **秘密情報は Secret Manager だけ。** いまあるもの：`ANTHROPIC_API_KEY`（Claude）、`GBIZINFO_TOKEN`（gBizINFO）。法人番号の ID は届いたら `HOUJIN_APP_ID` にする予定。チャット・リポジトリ・ログに値を出さない。トークンを入れ直したら、使う関数をデプロイし直す（デプロイ時の版を使い続けるため）。
 8. **リポジトリは公開。** Actions のログ・コミット・docs に、本人が読んだ記事・不要にした記事・メモ・営業先の情報を出さない（件数だけ）。メモや下書き、台帳の中身もログに出さない。
 9. **ログインは本人だけ（`i-kato@spark-partners.jp`、メール確認済み）。** 社外パートナーを入れるときは、ルールに役割（本人／パートナー）と見せる範囲を足す。

@@ -136,6 +136,19 @@ service cloud.firestore {
       allow read: if isOwner();
       allow write: if false;
     }
+    // Claude のチャットの窓口（MCP）のログインと合鍵（ハッシュだけ）。Knowledge Base の関数だけが読み書きする（画面からは読めない）
+    match /kbMcpClients/{id} {
+      allow read, write: if false;
+    }
+    match /kbMcpRequests/{id} {
+      allow read, write: if false;
+    }
+    match /kbMcpCodes/{id} {
+      allow read, write: if false;
+    }
+    match /kbMcpTokens/{id} {
+      allow read, write: if false;
+    }
     // 画面からの依頼（質問・テーマの承認など）。結果は Cloud Functions が書く（画面から関数を直接呼ばない）
     match /kbJobs/{job} {
       allow read, create: if isOwner();
