@@ -64,6 +64,18 @@ export const EXCLUSION_RULES: ExclusionRule[] = [
       `${ALWAYS_KEEP.source}|業務提携|提携|出資|ファンド|事業|法人|BtoB|SaaS|海外展開|ライセンス|IPビジネス|AI|DX|制作会社|スタジオ設立|採用|研修|調査|レポート|決算|新会社|設立|マーケティング|広告代理|動画制作|営業`,
     ),
   }),
+  titleRule({
+    id: 'sports-match',
+    label: 'スポーツの試合',
+    description:
+      'スポーツの試合・大会の日程、試合結果、オーダー発表、観戦チケット、ホームゲームのイベント、試合の配信・放送の案内。スポーツ関連でも、スポンサー・パートナー契約・協賛・冠試合・提携・出資・事業・サービス開始・データ活用・マーケティングなどビジネスの話は除外しない。',
+    updated: '2026-11-14',
+    include:
+      /試合|観戦|ホームゲーム|ホーム戦|開幕戦|対戦オーダー|対戦カード|プレシーズンマッチ|マッチデー|ナイター|公式戦|リーグ戦|[TＴ]リーグ|Bリーグ|B\.LEAGUE|Jリーグ|J\.LEAGUE|リーグワン|SV\.?LEAGUE|SVリーグ|Vリーグ|Fリーグ|プロ野球|RIZIN|UEFA|チャンピオンズリーグ/,
+    except: new RegExp(
+      `${ALWAYS_KEEP.source}|パートナー|スポンサー|協賛|冠試合|提携|連携|協定|出資|ファンド|事業|法人|BtoB|SaaS|DX|AI|データ|サービス|サイト|アプリ|オープン|開業|開院|設立|採用|研修|調査|レポート|決算|マーケティング|クラウドファンディング|独占`,
+    ),
+  }),
 ];
 
 export const ruleLabel = (id: string) => EXCLUSION_RULES.find((r) => r.id === id)?.label ?? id;
